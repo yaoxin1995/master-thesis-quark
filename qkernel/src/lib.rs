@@ -81,6 +81,10 @@ extern crate ssh_key;
 #[cfg(feature = "cc")]
 extern crate base64;
 
+#[cfg(feature = "cc")]
+extern crate yaxpeax_arch;
+#[cfg(feature = "cc")]
+extern crate yaxpeax_x86;
 
 use core::panic::PanicInfo;
 use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
@@ -166,12 +170,9 @@ pub mod kernel_def;
 pub mod rdma_def;
 mod syscalls;
 
-<<<<<<< HEAD
 #[cfg(feature = "cc")]
 mod shield;
 
-
-=======
 cfg_cc! {
     use crate::qlib::ShareSpace;
     use crate::qlib::kernel::Kernel::{ENABLE_CC, is_cc_enabled};
@@ -180,7 +181,6 @@ cfg_cc! {
     use alloc::boxed::Box;
     use memmgr::pma::PageMgr;
 }
->>>>>>> sev-snp: add GHCB support
 
 #[global_allocator]
 pub static VCPU_ALLOCATOR: GlobalVcpuAllocator = GlobalVcpuAllocator::New();
