@@ -63,8 +63,6 @@ use taskMgr::{CreateTask, IOWait, WaitFn};
 use vcpu::CPU_LOCAL;
 
 use crate::qlib::kernel::GlobalIOMgr;
-#[cfg(feature = "cc")]
-use crate::qlib::ShareSpace;
 
 //use self::qlib::buddyallocator::*;
 use self::asm::*;
@@ -90,8 +88,6 @@ use self::qlib::kernel::memmgr;
 use self::qlib::kernel::perflog;
 use self::qlib::kernel::quring;
 use self::qlib::kernel::Kernel;
-#[cfg (feature = "cc")]
-use self::qlib::kernel::Kernel::{ENABLE_CC, is_cc_enabled};
 use self::qlib::kernel::*;
 use self::qlib::{ShareSpaceRef, SysCallID};
 //use self::vcpu::*;
@@ -118,13 +114,6 @@ use self::syscalls::syscalls::*;
 use self::task::*;
 use self::threadmgr::task_sched::*;
 
-#[cfg(feature = "cc")]
-use self::qlib::mem::cc_allocator::*;
-#[cfg(feature = "cc")]
-use alloc::boxed::Box;
-#[cfg(feature = "cc")]
-use memmgr::pma::PageMgr;
-
 #[macro_use]
 mod print;
 
@@ -138,6 +127,15 @@ mod interrupt;
 pub mod kernel_def;
 pub mod rdma_def;
 mod syscalls;
+
+cfg_cc! {
+    use crate::qlib::ShareSpace;
+    use crate::qlib::kernel::Kernel::{ENABLE_CC, is_cc_enabled};
+    use crate::qlib::cc::sev_snp::ghcb::*;
+    use crate::qlib::mem::cc_allocator::*;
+    use alloc::boxed::Box;
+    use memmgr::pma::PageMgr;
+}
 
 #[global_allocator]
 pub static VCPU_ALLOCATOR: GlobalVcpuAllocator = GlobalVcpuAllocator::New();
@@ -600,6 +598,38 @@ fn InitLoader() {
     let mut process = Process::default();
     Kernel::HostSpace::LoadProcessKernel(&mut process as *mut _ as u64) as usize;
     LOADER.InitKernel(process).unwrap();
+}
+
+#[cfg(feature = "cc")]
+//Need to initialize PAGEMGR(pagepool for page allocator) and kernel page table in advance
+fn InitShareMemory() {
+    *GHCB[0].lock() = Some(GhcbHandle::default());
+    let ghcb_option: &mut Option<GhcbHandle<'_>> = &mut *GHCB[0].lock();
+    let ghcb = ghcb_option.as_mut().unwrap();
+    ghcb.init(true);
+    ghcb.set_memory_shared_2mb(
+        VirtAddr::new(MemoryDef::FILE_MAP_OFFSET),
+        MemoryDef::FILE_MAP_SIZE / MemoryDef::PAGE_SIZE_2M,
+    );
+    ghcb.set_memory_shared_2mb(
+        VirtAddr::new(MemoryDef::GUEST_HOST_SHARED_HEAP_OFFSET),
+        MemoryDef::GUEST_HOST_SHARED_HEAP_SIZE / MemoryDef::PAGE_SIZE_2M,
+    );
+    ghcb.set_memory_shared_4kb(
+        VirtAddr::new(MemoryDef::GHCB_OFFSET + MemoryDef::PAGE_SIZE),
+        MemoryDef::PAGE_SIZE_2M / MemoryDef::PAGE_SIZE - 1,
+    );
+}
+
+#[cfg(feature = "cc")]
+//Need to initialize PAGEMGR(pagepool for page allcator) and kernel page table in advance
+fn InitGhcb(vcpuid: usize) {
+    //A 2mb page is reserved for ghcbs, one ghcb is 4kb large
+    assert!(vcpuid < 0x200);
+    *GHCB[vcpuid].lock() = Some(GhcbHandle::new(vcpuid as u64));
+    let ghcb_option: &mut Option<GhcbHandle<'_>> = &mut *GHCB[vcpuid].lock();
+    let ghcb = ghcb_option.as_mut().unwrap();
+    ghcb.init(false);
 }
 
 #[no_mangle]
