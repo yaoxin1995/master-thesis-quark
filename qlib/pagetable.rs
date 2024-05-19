@@ -21,8 +21,12 @@ use core::sync::atomic::fence;
 use core::sync::atomic::AtomicBool;
 use core::sync::atomic::AtomicU64;
 use core::sync::atomic::Ordering;
-#[cfg(feature = "cc")]
-use crate::qlib::kernel::Kernel::{is_cc_enabled, IDENTICAL_MAPPING};
+
+cfg_cc! {
+    use crate::qlib::kernel::Kernel::{is_cc_enabled, IDENTICAL_MAPPING};
+    use crate::qlib::kernel::Kernel::ENABLE_CC;
+}
+
 cfg_x86_64! {
    pub use x86_64::structures::paging::page_table::PageTableEntry;
    pub use x86_64::structures::paging::page_table::PageTableIndex;
@@ -202,12 +206,23 @@ impl PageTables {
     }
 
     pub fn SwitchTo(&self) {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            return self.SwitchTo_cc();
+        }
         let addr = self.GetRoot();
         Self::Switch(addr);
     }
 
     #[cfg(target_arch = "x86_64")]
     pub fn IsActivePagetable(&self) -> bool {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.IsActivePagetable_cc() {
+                Err(_) => (),
+                Ok(r) => return r,
+            }
+        }
         let root = self.GetRoot();
         return root == Self::CurrentCr3();
     }
@@ -252,6 +267,13 @@ impl PageTables {
     }
 
     pub fn CopyRange(&self, to: &Self, start: u64, len: u64, pagePool: &Allocator) -> Result<()> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.CopyRange_cc(to, start, len, pagePool) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
         if start & MemoryDef::PAGE_MASK != 0 || len & MemoryDef::PAGE_MASK != 0 {
             return Err(Error::UnallignedAddress(format!("CopyRange {:x?}", len)));
         }
@@ -274,6 +296,13 @@ impl PageTables {
     // Copy the range and make the range readonly for from and to pagetable. It is used for VirtualArea private area.
     // The Copy On Write will be done when write to the page
     pub fn ForkRange(&self, to: &Self, start: u64, len: u64, pagePool: &Allocator) -> Result<()> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.ForkRange_cc(to, start, len, pagePool) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
         if start & MemoryDef::PAGE_MASK != 0 || len & MemoryDef::PAGE_MASK != 0 {
             return Err(Error::UnallignedAddress(format!(
                 "ForkRange start {:x} len {:x}",
@@ -352,6 +381,14 @@ impl PageTables {
 
     #[inline]
     pub fn VirtualToEntry(&self, vaddr: u64) -> Result<&PageTableEntry> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.VirtualToEntry_cc(vaddr) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
+
         let addr = vaddr;
         let vaddr = VirtAddr::new(vaddr);
 
@@ -394,6 +431,13 @@ impl PageTables {
     }
 
     pub fn VirtualToPhy(&self, vaddr: u64) -> Result<(u64, AccessType)> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.VirtualToPhy_cc(vaddr) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
         let pteEntry = self.VirtualToEntry(vaddr)?;
         if pteEntry.is_unused() {
             return Err(Error::AddressNotMap(vaddr));
@@ -418,6 +462,13 @@ impl PageTables {
     }
 
     pub fn MapVsyscall(&self, phyAddrs: Arc<Vec<u64>> /*4 pages*/) {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.MapVsyscall_cc(phyAddrs.clone()) {
+                Err(Error::InvalidInput) => (),
+                _ => return,
+            }
+        }
         let vaddr = 0xffffffffff600000;
         let pt: *mut PageTable = self.GetRoot() as *mut PageTable;
         unsafe {
@@ -427,6 +478,7 @@ impl PageTables {
 
             assert!(pgdEntry.is_unused());
             pudTbl = phyAddrs[3] as *mut PageTable;
+
             pgdEntry.set_addr(
                 PhysAddr::new(pudTbl as u64),
                 PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE,
@@ -443,6 +495,14 @@ impl PageTables {
         flags: PageTableFlags,
         pagePool: &Allocator,
     ) -> Result<(PageTableEntry, bool)> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.MapPage_cc(vaddr, phyAddr, flags, pagePool) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
+
         let mut res = false;
 
         let vaddr = Addr(vaddr.0 & !(PAGE_SIZE - 1));
@@ -527,12 +587,18 @@ impl PageTables {
         flags: PageTableFlags,
         pagePool: &Allocator,
     ) -> Result<bool> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.Remap_cc(start, end, oldStart, flags, pagePool) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
         start.PageAligned()?;
         oldStart.PageAligned()?;
         if end.0 < start.0 {
             return Err(Error::AddressNotInRange);
         }
-
         let mut addrs = Vec::new();
 
         let mut offset = 0;
@@ -586,6 +652,13 @@ impl PageTables {
         flags: PageTableFlags,
         pagePool: &Allocator,
     ) -> Result<bool> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.RemapForFile_cc(start, end, physical, oldStart, oldEnd, flags, pagePool) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
         start.PageAligned()?;
         oldStart.PageAligned()?;
         if end.0 < start.0 {
@@ -849,6 +922,13 @@ impl PageTables {
     }
 
     pub fn Unmap(&self, start: u64, end: u64, pagePool: &Allocator) -> Result<()> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.Unmap_cc(start, end, pagePool) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
         Addr(start).PageAligned()?;
         Addr(end).PageAligned()?;
         let mut start = start;
@@ -1004,6 +1084,13 @@ impl PageTables {
         end: Addr,
         pages: &mut BTreeSet<u64>,
     ) -> Result<()> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.GetAllPagetablePagesWithRange_cc(start, end, pages) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
         //let mut curAddr = start;
         let pt: *mut PageTable = self.GetRoot() as *mut PageTable;
         unsafe {
@@ -1101,6 +1188,13 @@ impl PageTables {
         mut f: impl FnMut(&mut PageTableEntry, u64),
         failFast: bool,
     ) -> Result<()> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.Traverse_cc(start, end, &mut f, failFast) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
         start.PageAligned()?;
         end.PageAligned()?;
         //let mut curAddr = start;
@@ -1368,6 +1462,13 @@ impl PageTables {
 
     // ret: >0: the swapped out page addr, 0: the page is missing
     pub fn SwapInPage(&self, vaddr: Addr) -> Result<u64> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.SwapInPage_cc(vaddr) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
         let vaddr = Addr(vaddr.0 & !(PAGE_SIZE - 1));
         let pt: *mut PageTable = self.GetRoot() as *mut PageTable;
         unsafe {
@@ -1552,7 +1653,6 @@ impl PageTables {
         flags: PageTableFlags,
         failFast: bool,
     ) -> Result<()> {
-        //info!("MProtoc: start={:x}, end={:x}, flag = {:?}", start.0, end.0, flags);
         defer!(self.EnableTlbShootdown());
         #[cfg(target_arch = "x86_64")]
         {
@@ -1585,7 +1685,14 @@ impl PageTables {
         }
     }
 
-    fn freeEntry(&self, entry: &mut PageTableEntry, pagePool: &Allocator) -> Result<bool> {
+    pub fn freeEntry(&self, entry: &mut PageTableEntry, pagePool: &Allocator) -> Result<bool> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.freeEntry_cc(entry, pagePool) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
         let currAddr = entry.addr().as_u64();
         let refCnt = pagePool.Deref(currAddr)?;
         if refCnt == 0 {
@@ -1606,6 +1713,13 @@ impl PageTables {
         pagePool: &Allocator,
         kernel: bool,
     ) -> Result<bool> {
+        #[cfg(feature = "cc")]
+        if ENABLE_CC.load(Ordering::Acquire) {
+            match self.mapCanonical_cc(start, end, phyAddr, flags, pagePool, kernel) {
+                Err(Error::InvalidInput) => (),
+                r => return r,
+            }
+        }
         let mut res = false;
 
         //info!("mapCanonical virtual start is {:x}, len is {:x}, phystart is {:x}", start.0, end.0 - start.0, phyAddr.0);
