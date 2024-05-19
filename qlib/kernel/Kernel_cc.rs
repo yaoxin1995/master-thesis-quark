@@ -32,6 +32,7 @@ use crate::qlib::control_msg::ControlMsg;
 use crate::qlib::proxy::*;
 use crate::GLOBAL_ALLOCATOR;
 use crate::GUEST_HOST_SHARED_ALLOCATOR;
+pub static LOG_AVAILABLE: AtomicBool = AtomicBool::new(true);
 
 impl HostSpace {
     pub fn WakeupVcpu(vcpuId: u64) {
@@ -1932,6 +1933,9 @@ impl HostSpace {
     }
 
     pub fn Panic(str: &str) {
+        if !LOG_AVAILABLE.load(Ordering::Acquire){
+            return;
+        }
         if is_cc_enabled() {
             //copy the &str to shared buffer
             let bytes = str.as_bytes();
@@ -2867,6 +2871,9 @@ impl HostSpace {
     }
 
     pub fn SyncPrint(level: DebugLevel, str: &str) {
+        if !LOG_AVAILABLE.load(Ordering::Acquire){
+            return;
+        }
         if is_cc_enabled() {
             //copy the &str to shared buffer
             let bytes = str.as_bytes();

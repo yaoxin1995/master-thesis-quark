@@ -51,6 +51,10 @@ extern crate spin;
 #[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 extern crate xmas_elf;
+#[cfg(feature = "cc")]
+extern crate yaxpeax_arch;
+#[cfg(feature = "cc")]
+extern crate yaxpeax_x86;
 
 use core::panic::PanicInfo;
 use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
