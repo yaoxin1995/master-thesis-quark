@@ -135,6 +135,10 @@ pub struct VMSpace {
 
     pub rdmaSvcCliSock: i32,
     pub podId: [u8;64],
+    #[cfg(feature = "cc")]
+    pub kvmfd: i32,
+    #[cfg(feature = "cc")]
+    pub vmfd: i32,
 }
 
 unsafe impl Sync for VMSpace {}
@@ -164,6 +168,10 @@ impl VMSpace {
             haveMembarrierPrivateExpedited: haveMembarrierPrivateExpedited,
             rdmaSvcCliSock: 0,
             podId: [0u8;64],
+            #[cfg(feature = "cc")]
+            kvmfd: 0,
+            #[cfg(feature = "cc")]
+            vmfd: 0,
         };
     }
 
