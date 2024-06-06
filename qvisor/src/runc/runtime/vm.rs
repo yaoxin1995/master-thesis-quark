@@ -23,8 +23,10 @@ use kvm_ioctls::{Cap, Kvm, VmFd};
 use lazy_static::lazy_static;
 use nix::sys::signal;
 
+#[cfg(feature = "cc")]
+use crate::qlib::cc::sev_snp::{check_amd, check_snp_support, set_cbit_mask};
 #[cfg (feature = "cc")]
-use crate::qlib::kernel::Kernel::{ENABLE_CC, IDENTICAL_MAPPING};
+use crate::qlib::kernel::Kernel::{ENABLE_CC, IDENTICAL_MAPPING, IS_SEV_SNP};
 use crate::qlib::MAX_VCPU_COUNT;
 use crate::tsot_agent::TSOT_AGENT;
 //use crate::vmspace::hibernate::HiberMgr;
@@ -306,6 +308,16 @@ impl VirtualMachine {
                 ENABLE_CC.store(true,Ordering::Release);
                 IDENTICAL_MAPPING.store(false,Ordering::Release);
                 return Self::InitNormalCC(args, CCMode::NormalEmu);
+            }
+            #[cfg(feature = "cc")]
+            CCMode::SevSnp => {
+                if check_amd() && check_snp_support() {
+                    ENABLE_CC.store(true, Ordering::Release);
+                    IS_SEV_SNP.store(true, Ordering::Release);
+                    set_cbit_mask();
+                    return Self::InitSevSnp(args);
+                }
+                panic!("SEV-SNP is not supported on this machine!");
             }
             _ => panic!("CCMode not compiled!"),
         }

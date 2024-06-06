@@ -88,6 +88,9 @@ pub mod rdmasocket;
 pub mod tsot_msg;
 pub mod unix_socket;
 
+#[cfg (feature = "cc")]
+pub mod cc;
+
 use self::kernel::dns::dns_svc::DnsSvc;
 use self::mutex::*;
 #[cfg(not(feature = "cc"))]
