@@ -33,6 +33,8 @@ use crate::qlib::proxy::*;
 pub static ENABLE_CC: AtomicBool = AtomicBool::new(false);
 #[cfg (feature = "cc")]
 pub static IDENTICAL_MAPPING: AtomicBool = AtomicBool::new(true);
+#[cfg (feature = "cc")]
+pub static IS_SEV_SNP: AtomicBool = AtomicBool::new(false);
 
 #[inline(always)]
 #[cfg (feature = "cc")]
