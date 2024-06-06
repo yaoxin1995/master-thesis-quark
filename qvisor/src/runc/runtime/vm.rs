@@ -530,6 +530,9 @@ impl VirtualMachine {
             // enable cpuid in host
             #[cfg(target_arch = "x86_64")]
             vcpu.vcpu.set_cpuid2(&kvm_cpuid).unwrap();
+            #[cfg(feature = "cc")]
+            #[cfg(target_arch = "x86_64")]
+            vcpu.x86_init()?;
             VMS.lock().vcpus.push(vcpu.clone());
             vcpus.push(vcpu);
         }
@@ -746,6 +749,8 @@ impl VirtualMachine {
             // enable cpuid in host
             #[cfg(target_arch = "x86_64")]
             vcpu.vcpu.set_cpuid2(&kvm_cpuid).unwrap();
+            #[cfg(target_arch = "x86_64")]
+            vcpu.x86_init()?;
             VMS.lock().vcpus.push(vcpu.clone());
             vcpus.push(vcpu);
         }

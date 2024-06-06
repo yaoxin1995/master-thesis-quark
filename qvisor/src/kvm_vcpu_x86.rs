@@ -50,9 +50,11 @@ use super::qlib::perf_tunning::*;
 use super::runc::runtime::vm::*;
 use super::syncmgr::*;
 #[cfg(feature = "cc")]
+use crate::qlib::cc::sev_snp::C_BIT_MASK;
+#[cfg(feature = "cc")]
 use super::qlib::qmsg::sharepara::*;
 #[cfg(feature = "cc")]
-use qlib::kernel::Kernel::{is_cc_enabled, IDENTICAL_MAPPING};
+use qlib::kernel::Kernel::{is_cc_enabled, IDENTICAL_MAPPING, IS_SEV_SNP};
 #[cfg(feature = "cc")]
 use crate::qlib::task_mgr::TaskId;
 
@@ -228,6 +230,15 @@ impl KVMVcpu {
         //vcpu_sregs.cr0 = CR0_PE | CR0_MP | CR0_AM | CR0_ET | CR0_NE | CR0_WP | CR0_PG;
         vcpu_sregs.cr0 = CR0_PE | CR0_AM | CR0_ET | CR0_PG | CR0_NE; // | CR0_WP; // | CR0_MP | CR0_NE;
         vcpu_sregs.cr3 = VMS.lock().pageTables.GetRoot();
+
+        #[cfg(feature = "cc")]
+        if is_cc_enabled() {
+            if IS_SEV_SNP.load(Ordering::Acquire) {
+                vcpu_sregs.cr3 =
+                    VMS.lock().pageTables.GetRoot() | C_BIT_MASK.load(Ordering::Acquire);
+            }
+        }
+
         //vcpu_sregs.cr4 = CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT;
         vcpu_sregs.cr4 =
             CR4_PSE | CR4_PAE | CR4_PGE | CR4_OSFXSR | CR4_OSXMMEXCPT | CR4_FSGSBASE | CR4_OSXSAVE; // | CR4_UMIP ;// CR4_PSE | | CR4_SMEP | CR4_SMAP;
@@ -275,39 +286,43 @@ impl KVMVcpu {
 
     pub fn run(&self, tgid: i32) -> Result<()> {
         SetExitSignal();
-        self.setup_long_mode()?;
         let tid = unsafe { gettid() };
         self.threadid.store(tid as u64, Ordering::SeqCst);
         self.tgid.store(tgid as u64, Ordering::SeqCst);
 
-        let regs: kvm_regs = kvm_regs {
-            rflags: KERNEL_FLAGS_SET,
-            rip: self.entry,
-            rsp: self.topStackAddr,
-            rax: 0x11,
-            rbx: 0xdd,
-            //arg0
-            rdi: self.heapStartAddr, // self.pageAllocatorBaseAddr + self.,
-            //arg1
-            rsi: self.shareSpaceAddr,
-            //arg2
-            rdx: self.id as u64,
-            //arg3
-            rcx: VMS.lock().vdsoAddr,
-            //arg4
-            r8: self.vcpuCnt as u64,
-            //arg5
-            r9: self.autoStart as u64,
-            //rdx:
-            //rcx:
-            ..Default::default()
-        };
+        #[cfg(not(feature = "cc"))]
+        {
+            self.setup_long_mode()?;
+            let regs: kvm_regs = kvm_regs {
+                rflags: KERNEL_FLAGS_SET,
+                rip: self.entry,
+                rsp: self.topStackAddr,
+                rax: 0x11,
+                rbx: 0xdd,
+                //arg0
+                rdi: self.heapStartAddr, // self.pageAllocatorBaseAddr + self.,
+                //arg1
+                rsi: self.shareSpaceAddr,
+                //arg2
+                rdx: self.id as u64,
+                //arg3
+                rcx: VMS.lock().vdsoAddr,
+                //arg4
+                r8: self.vcpuCnt as u64,
+                //arg5
+                r9: self.autoStart as u64,
+                //rdx:
+                //rcx:
+                ..Default::default()
+            };
 
-        self.vcpu
-            .set_regs(&regs)
-            .map_err(|e| Error::IOError(format!("io::error is {:?}", e)))?;
+            self.vcpu
+                .set_regs(&regs)
+                .map_err(|e| Error::IOError(format!("io::error is {:?}", e)))?;
 
-        self.SetXCR0()?;
+            self.SetXCR0()?;
+            self.SignalMask();
+        }
 
         let mut lastVal: u32 = 0;
         let mut first = true;
@@ -319,8 +334,6 @@ impl KVMVcpu {
             // print cpu id
             core_affinity::set_for_current(coreid);
         }
-
-        self.SignalMask();
 
         info!(
             "start enter guest[{}]: entry is {:x}, stack is {:x}",
@@ -920,5 +933,40 @@ impl KVMVcpu {
 
     pub fn get_frequency(&self) -> Result<u64> {
         Ok((self.vcpu.get_tsc_khz().map_err(|e| Error::SysError(e.errno()))? as u64) * 1000)
+    }
+
+    pub fn x86_init(&self) -> Result<()> {
+        self.setup_long_mode()?;
+        let regs: kvm_regs = kvm_regs {
+            rflags: KERNEL_FLAGS_SET,
+            rip: self.entry,
+            rsp: self.topStackAddr,
+            rax: 0x11,
+            rbx: 0xdd,
+            //arg0
+            rdi: self.heapStartAddr, // self.pageAllocatorBaseAddr + self.,
+            //arg1
+            rsi: self.shareSpaceAddr,
+            //arg2
+            rdx: self.id as u64,
+            //arg3
+            rcx: VMS.lock().vdsoAddr,
+            //arg4
+            r8: self.vcpuCnt as u64,
+            //arg5
+            r9: self.autoStart as u64,
+            //rdx:
+            //rcx:
+            ..Default::default()
+        };
+
+        self.vcpu
+            .set_regs(&regs)
+            .map_err(|e| Error::IOError(format!("io::error is {:?}", e)))?;
+
+        self.SetXCR0()?;
+        self.SignalMask();
+        info!("vcpu{} x86_init finished", self.id);
+        return Ok(());
     }
 }
