@@ -730,6 +730,12 @@ impl KVMVcpu {
                                 }
                             }
                         }
+                        
+                        #[cfg(feature = "cc")]
+                        qlib::HYPERCALL_TEST => {
+                            let a = data as *const _ as *const u16;
+                            info!("GHCB IO TEST data: {:x}", unsafe { *a });
+                        }
 
                         _ => info!("Unknow hyper call!!!!! address is {}", addr),
                     }
