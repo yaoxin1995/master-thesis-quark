@@ -172,6 +172,8 @@ pub const HYPERCALL_VCPU_WAIT: u16 = 23;
 pub const HYPERCALL_RELEASE_VCPU: u16 = 24;
 #[cfg(feature = "cc")]
 pub const HYPERCALL_SHARESPACE_INIT: u16 = 25;
+#[cfg(feature = "cc")]
+pub const HYPERCALL_TEST: u16 = 0x3f;
 
 #[cfg(not(feature = "cc"))]
 pub const DUMMY_TASKID: TaskId = TaskId::New(0xffff_ffff);
