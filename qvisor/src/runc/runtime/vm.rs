@@ -719,6 +719,8 @@ impl VirtualMachine {
             autoStart = args.AutoStart;
             vms.pivot = args.Pivot;
             vms.args = Some(args);
+            vms.kvmfd = kvmfd;
+            vms.vmfd = vm_fd.as_raw_fd();
         }
 
         let entry = elf.LoadKernel(Self::KERNEL_IMAGE)?;

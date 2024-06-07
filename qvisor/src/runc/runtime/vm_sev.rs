@@ -282,11 +282,8 @@ impl VirtualMachine {
             autoStart = args.AutoStart;
             vms.pivot = args.Pivot;
             vms.args = Some(args);
-<<<<<<< HEAD
             vms.kvmfd = kvmfd;
             vms.vmfd = launcher.as_ref().as_raw_fd();
-=======
->>>>>>> 3a0e9efe (fix)
         }
 
         let cpuid_page_addr = MemoryDef::CPUID_PAGE;
