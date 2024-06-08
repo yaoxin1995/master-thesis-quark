@@ -673,6 +673,7 @@ pub extern "C" fn rust_main(
                         {
                             let _ret = pvalidate(VirtAddr::new(i), PvalidateSize::Size4K, true);
                         }
+                        GLOBAL_ALLOCATOR.SwitchToPrivateRunningHeap();
                         unsafe {
                             KERNEL_PAGETABLE
                                 .Init(PageTables::Init(CurrentKernelTable() & 0xffff_ffff_ffff));

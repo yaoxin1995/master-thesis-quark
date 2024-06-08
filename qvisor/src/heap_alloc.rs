@@ -11,7 +11,7 @@ use super::qlib::mem::list_allocator::*;
 pub const ENABLE_HUGEPAGE: bool = false;
 
 #[cfg(feature = "cc")]
-use crate::qlib::kernel::Kernel::IDENTICAL_MAPPING;
+use crate::qlib::kernel::Kernel::{IDENTICAL_MAPPING, IS_SEV_SNP};
 
 impl BitmapAllocatorWrapper {
     pub const fn New() -> Self {
@@ -236,7 +236,7 @@ impl HostAllocator {
             self.guestPrivHeapAddr.load(Ordering::Relaxed),
             guestPrivHeapAddr
         );
-        let heap_size = if identical {
+        let heap_size = if identical || IS_SEV_SNP.load(Ordering::Acquire){
             MemoryDef::GUEST_PRIVATE_HEAP_SIZE
         } else {
             MemoryDef::GUEST_PRIVATE_INIT_HEAP_SIZE

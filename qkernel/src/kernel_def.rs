@@ -572,20 +572,7 @@ impl HostAllocator {
         match mode {
             CCMode::NormalEmu => {
                 crate::qlib::kernel::Kernel::IDENTICAL_MAPPING.store(false, Ordering::SeqCst);
-                self.guestPrivHeapAddr.store(
-                    MemoryDef::GUEST_PRIVATE_RUNNING_HEAP_OFFSET,
-                    Ordering::SeqCst,
-                );
-                *self.GuestPrivateAllocator() = ListAllocator::New(
-                    MemoryDef::GUEST_PRIVATE_RUNNING_HEAP_OFFSET,
-                    MemoryDef::GUEST_PRIVATE_RUNNING_HEAP_OFFSET
-                        + MemoryDef::GUEST_PRIVATE_RUNNING_HEAP_SIZE,
-                );
-                let size = core::mem::size_of::<ListAllocator>();
-                self.GuestPrivateAllocator().Add(
-                    MemoryDef::GUEST_PRIVATE_RUNNING_HEAP_OFFSET as usize + size,
-                    MemoryDef::GUEST_PRIVATE_RUNNING_HEAP_SIZE as usize - size,
-                );
+                self.SwitchToPrivateRunningHeap();
             }
             _ => {
                 self.guestPrivHeapAddr
@@ -613,6 +600,23 @@ impl HostAllocator {
             MemoryDef::GUEST_HOST_SHARED_HEAP_SIZE as usize - size);
     }
 
+    #[cfg(feature = "cc")]
+    pub fn SwitchToPrivateRunningHeap(&self) {
+        self.guestPrivHeapAddr.store(
+            MemoryDef::GUEST_PRIVATE_RUNNING_HEAP_OFFSET,
+            Ordering::SeqCst,
+        );
+        *self.GuestPrivateAllocator() = ListAllocator::New(
+            MemoryDef::GUEST_PRIVATE_RUNNING_HEAP_OFFSET,
+            MemoryDef::GUEST_PRIVATE_RUNNING_HEAP_OFFSET
+                + MemoryDef::GUEST_PRIVATE_RUNNING_HEAP_SIZE,
+        );
+        let size = core::mem::size_of::<ListAllocator>();
+        self.GuestPrivateAllocator().Add(
+            MemoryDef::GUEST_PRIVATE_RUNNING_HEAP_OFFSET as usize + size,
+            MemoryDef::GUEST_PRIVATE_RUNNING_HEAP_SIZE as usize - size,
+        );
+    }
     #[cfg(not(feature = "cc"))]
     pub fn Init(&self, heapAddr: u64) {
         self.listHeapAddr.store(heapAddr, Ordering::SeqCst);
