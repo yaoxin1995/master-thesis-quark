@@ -17,10 +17,14 @@ use alloc::vec::Vec;
 use core::ptr;
 use core::sync::atomic;
 
+#[cfg(feature = "cc")]
+use crate::qlib::cc::sev_snp::amd_snp_driver::{UserMemScope, SEV_SNP_DRIVER};
 use crate::qlib::kernel::kernel::kernel::GetKernel;
 #[cfg(feature = "cc")]
 use crate::qlib::kernel::Kernel::is_cc_enabled;
 use crate::qlib::kernel::Kernel::HostSpace;
+#[cfg(feature = "cc")]
+use alloc::string::ToString;
 //use crate::qlib::mem::list_allocator::*;
 use super::super::super::super::kernel_def::{
     StartExecProcess, StartRootContainer, StartSubContainerProcess,
@@ -49,6 +53,25 @@ pub fn ControllerProcessHandler() -> Result<()> {
     }
 }
 
+#[cfg(feature = "cc")]
+// Returns a base64 of the sha512 of all chunks.
+pub fn hash_chunks(chunks: Vec<Vec<u8>>) -> String {
+    use base64ct::{Base64, Encoding};
+    use sha2::{Digest, Sha512};
+
+    let mut hasher = Sha512::new();
+
+    for chunk in chunks.iter() {
+        hasher.update(chunk);
+    }
+
+    let res = hasher.finalize();
+
+    let base64 = Base64::encode_string(&res);
+
+    base64
+}
+
 pub fn HandleSignal(signalArgs: &SignalArgs) {
     info!("HandleSignal: get signal {:?}", &signalArgs);
 
@@ -72,7 +95,8 @@ pub fn HandleSignal(signalArgs: &SignalArgs) {
         return;
     }*/
 
-    #[cfg(not(feature = "cc"))]{
+    #[cfg(not(feature = "cc"))]
+    {
         if signalArgs.Signo == SIGSTOP.0 || signalArgs.Signo == SIGUSR2.0 {
             if SHARESPACE.hibernatePause.load(atomic::Ordering::Relaxed) {
                 // if the sandbox has been paused, return
@@ -112,7 +136,7 @@ pub fn HandleSignal(signalArgs: &SignalArgs) {
 
     #[cfg(feature = "cc")]
     {
-        if !is_cc_enabled(){
+        if !is_cc_enabled() {
             if signalArgs.Signo == SIGSTOP.0 || signalArgs.Signo == SIGUSR2.0 {
                 if SHARESPACE.hibernatePause.load(atomic::Ordering::Relaxed) {
                     // if the sandbox has been paused, return
@@ -207,6 +231,8 @@ pub fn SignalHandler(_: *const u8) {
 }
 
 pub fn ControlMsgHandler(fd: *const u8) {
+    #[cfg(feature = "cc")]
+    use base64ct::Encoding;
     let fd = fd as i32;
 
     let task = Task::Current();
@@ -215,6 +241,30 @@ pub fn ControlMsgHandler(fd: *const u8) {
 
     //info!("payload: {:?}", &msg.payload);
     //defer!(error!("payload handling ends"));
+    #[cfg(feature = "cc")]
+    {
+        let usermemscope = UserMemScope;
+        let report_buf = [0u8; 4096];
+
+        let ehd_chunks = vec!["asdnajsndjksand".to_string().into_bytes()];
+        let nonce = hash_chunks(ehd_chunks);
+
+        let report_data_bin = base64ct::Base64::decode_vec(&nonce)
+            .map_err(|e| Error::Common(format!("get_report, Base64::decode_vec failed: {:?}", e)))
+            .unwrap();
+        let a = SEV_SNP_DRIVER
+            .lock()
+            .get_attestation(
+                usermemscope,
+                report_data_bin.as_ptr().addr(),
+                report_data_bin.len(),
+                &report_buf as *const [u8] as *const u8 as usize,
+                report_buf.len(),
+            )
+            .unwrap();
+        info!("atteation finished {:?}", a);
+    }
+
     match msg.payload {
         Payload::Pause => {
             let kernel = LOADER.Lock(task).unwrap().kernel.clone();

@@ -25,6 +25,8 @@
 #![allow(invalid_reference_casting)]
 #![feature(allocator_api)]
 #![feature(btreemap_alloc)]
+#![feature(strict_provenance)]
+#![feature(trivial_bounds)]
 #![allow(improper_ctypes_definitions)]
 #![allow(improper_ctypes)]
 
