@@ -17,10 +17,14 @@ use self::Error::{FailInput, FailSizeMismatch, Unknown};
 use core::arch::asm;
 use core::sync::atomic::{AtomicU64, Ordering};
 use x86_64::VirtAddr;
+use core::cell::UnsafeCell;
 
 pub mod cpuid_page;
 pub mod ghcb;
 pub mod vc;
+pub mod amd_snp_driver;
+pub mod secret_page;
+mod racycell;
 
 // The C-Bit mask indicating encrypted physical addresses
 pub static C_BIT_MASK: AtomicU64 = AtomicU64::new(0);
@@ -288,3 +292,20 @@ impl SVMExitDef {
         return ((modrm) & 0x38) >> 3;
     }
 }
+
+#[repr(transparent)]
+pub struct RacyCell<T>(UnsafeCell<T>);
+
+impl<T> RacyCell<T> {
+    /// Create a new RacyCell
+    pub const fn new(value: T) -> Self {
+        RacyCell(UnsafeCell::new(value))
+    }
+
+    /// Gets a mutable pointer to the wrapped value.
+    pub fn get(&self) -> *mut T {
+        self.0.get()
+    }
+}
+
+unsafe impl<T: Sync> Sync for RacyCell<T> {}

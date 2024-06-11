@@ -13,7 +13,7 @@ cuda_release:
 	CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) build --release --features cuda
 
 cc_debug:
-	CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) build --features cc
+	RUSTFLAGS="--cfg aes_force_soft --cfg polyval_force_soft" CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) build --features cc
 
 cc_release:
-	CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) build --release --features cc
+	RUSTFLAGS="--cfg aes_force_soft --cfg polyval_force_soft" CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) build --release --features cc

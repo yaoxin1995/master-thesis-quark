@@ -287,6 +287,40 @@ impl<'a> GhcbHandle<'a> {
         *self.ghcb = Ghcb::default();
     }
 
+    /// GHCB GUEST_REQUEST
+    ///
+    /// # Safety
+    /// undefined behaviour, if the parameters don't follow the GHCB protocol
+    pub unsafe fn guest_req(&mut self, req_gpa: PhysAddr, resp_gpa: PhysAddr) -> Result<(), u64> {
+        const SVM_VMGEXIT_GUEST_REQUEST: u64 = 0x80000011;
+
+        self.invalidate();
+
+        let res = self.vmgexit(
+            SVM_VMGEXIT_GUEST_REQUEST,
+            req_gpa.as_u64(),
+            resp_gpa.as_u64(),
+        ).map_err(|a| 
+            match a {
+                GhcbError::VmmError => u64::MAX,
+                GhcbError::Exception(num) => num
+            });
+
+        if res.is_err() {
+            unsafe {
+                early_panic(4, 0x35);
+            }
+        }
+        if self.ghcb.save_area.sw_exit_info2 != 0 {
+            // unsafe {
+            //     early_panic(4, 0x35);
+            // }
+            Err(self.ghcb.save_area.sw_exit_info2)
+        } else {
+            Ok(())
+        }
+    }
+    
     /// do a vmgexit with the ghcb block
     ///
     /// # Safety

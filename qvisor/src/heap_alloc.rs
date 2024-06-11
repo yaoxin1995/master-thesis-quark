@@ -236,7 +236,7 @@ impl HostAllocator {
             self.guestPrivHeapAddr.load(Ordering::Relaxed),
             guestPrivHeapAddr
         );
-        let heap_size = if identical || IS_SEV_SNP.load(Ordering::Acquire){
+        let heap_size = if identical || IS_SEV_SNP.load(Ordering::Acquire) {
             MemoryDef::GUEST_PRIVATE_HEAP_SIZE
         } else {
             MemoryDef::GUEST_PRIVATE_INIT_HEAP_SIZE
@@ -245,10 +245,8 @@ impl HostAllocator {
         *self.GuestPrivateAllocator() = ListAllocator::New(guestPrivHeapStart, guestPrivHeapEnd);
 
         let size = core::mem::size_of::<ListAllocator>();
-        self.GuestPrivateAllocator().Add(
-            guestPrivHeapAddr as usize + size,
-            heap_size as usize - size,
-        );
+        self.GuestPrivateAllocator()
+            .Add(guestPrivHeapAddr as usize + size, heap_size as usize - size);
     }
 
     #[cfg(feature = "cc")]
@@ -257,11 +255,12 @@ impl HostAllocator {
         let shaedHeapEnd = sharedHeapStart + MemoryDef::GUEST_HOST_SHARED_HEAP_SIZE as u64;
         *self.GuestHostSharedAllocator() = ListAllocator::New(sharedHeapStart as _, shaedHeapEnd);
 
-
         // reserve 4 pages for the listAllocator and share para page
         let size = 4 * MemoryDef::PAGE_SIZE as usize;
-        self.GuestHostSharedAllocator().Add(MemoryDef::GUEST_HOST_SHARED_HEAP_OFFSET as usize + size,
-            MemoryDef::GUEST_HOST_SHARED_HEAP_SIZE as usize - size);
+        self.GuestHostSharedAllocator().Add(
+            MemoryDef::GUEST_HOST_SHARED_HEAP_OFFSET as usize + size,
+            MemoryDef::GUEST_HOST_SHARED_HEAP_SIZE as usize - size,
+        );
     }
 
     #[cfg(feature = "cc")]
@@ -331,6 +330,36 @@ impl HostAllocator {
             MemoryDef::GHCB_OFFSET,
             host_init_ghcb_addr
         );
+
+        let attestation_req_addr = unsafe {
+            let flags = libc::MAP_SHARED | libc::MAP_ANON | libc::MAP_FIXED;
+            libc::mmap(
+                MemoryDef::ATTESTATION_REQ_REQ as _,
+                MemoryDef::PAGE_SIZE as usize,
+                libc::PROT_READ | libc::PROT_WRITE,
+                flags,
+                -1,
+                0,
+            ) as u64
+        };
+        if attestation_req_addr == libc::MAP_FAILED as u64 {
+            panic!("mmap: failed to get mapped memory area for cpuid page");
+        }
+
+        let attestation_rsp_addr = unsafe {
+            let flags = libc::MAP_SHARED | libc::MAP_ANON | libc::MAP_FIXED;
+            libc::mmap(
+                MemoryDef::ATTESTATION_REQ_RSP as _,
+                MemoryDef::PAGE_SIZE as usize,
+                libc::PROT_READ | libc::PROT_WRITE,
+                flags,
+                -1,
+                0,
+            ) as u64
+        };
+        if attestation_rsp_addr == libc::MAP_FAILED as u64 {
+            panic!("mmap: failed to get mapped memory area for cpuid page");
+        }
     }
 }
 
@@ -346,7 +375,6 @@ unsafe impl GlobalAlloc for HostAllocator {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-
         let addr = ptr as u64;
         if !Self::IsIOBuf(addr) {
             self.Allocator().dealloc(ptr, layout);
@@ -379,7 +407,7 @@ unsafe impl GlobalAlloc for HostAllocator {
         let is_vm_init = self.vmLaunched.load(Ordering::Relaxed);
         if !is_vm_init && self.IsGuestPrivateHeapAddr(addr) {
             self.GuestPrivateAllocator().dealloc(ptr, layout);
-            return
+            return;
         }
 
         if Self::IsSharedHeapAddr(addr) {

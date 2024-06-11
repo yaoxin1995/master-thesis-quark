@@ -66,7 +66,6 @@ use super::qlib::addr::Addr;
 use super::qlib::common::{Error, Result};
 use super::qlib::control_msg::*;
 use super::qlib::kernel::SignalProcess;
-use super::qlib::linux::membarrier::*;
 use super::qlib::linux_def::*;
 use super::qlib::pagetable::PageTables;
 use super::qlib::pagetable::PageTableFlags;
