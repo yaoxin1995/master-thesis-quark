@@ -39,7 +39,6 @@ extern crate bitflags;
 extern crate cache_padded;
 extern crate crossbeam_queue;
 extern crate enum_dispatch;
-extern crate hashbrown;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -655,7 +654,7 @@ pub extern "C" fn rust_main(
         }
         debug!("init vsyscall finished");
         GlobalIOMgr().InitPollHostEpoll(SHARESPACE.HostHostEpollfd());
-        debug!("init host epoll fd finished");
+        debug!("init host epoll fd finished 111122");
         VDSO.Initialization(vdsoParamAddr);
         debug!("init vdso finished");
 
