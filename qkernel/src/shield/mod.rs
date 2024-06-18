@@ -1,5 +1,5 @@
 pub mod qkernel_log_magager;
-
+pub mod guest_syscall_interceptor;
 
 use crate::aes_gcm::{ Aes256Gcm, Key};
 use alloc::{vec::Vec, string::String};
@@ -8,6 +8,7 @@ use spin::rwlock::RwLock;
 use alloc::string::ToString;
 use core::convert::TryInto;
 use qlib::shield_policy::KbsPolicy;
+use crate::shield::guest_syscall_interceptor::syscall_interceptor_policy_update;
 
 lazy_static! {
     pub static ref APPLICATION_INFO_KEEPER:  RwLock<ApplicationInfoKeeper> = RwLock::new(ApplicationInfoKeeper::default());

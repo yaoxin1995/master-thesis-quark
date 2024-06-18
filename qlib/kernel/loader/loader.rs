@@ -42,7 +42,7 @@ use crate::shield::{//secret_injection::SECRET_KEEPER,
     //software_measurement_manager, https_attestation_provisioning_cli, 
     policy_provisioning,
     APPLICATION_INFO_KEEPER, 
-    //guest_syscall_interceptor
+    guest_syscall_interceptor
     };
 
 
@@ -373,16 +373,18 @@ pub fn Load(
             // TEST
             {
                 shield_policy.qkernel_log_config.enable = true;
-                shield_policy.qkernel_log_config.allowed_max_log_level = QkernelDebugLevel::Off;
+                shield_policy.qkernel_log_config.allowed_max_log_level = QkernelDebugLevel::Debug;
                 shield_policy.privileged_user_key_slice = "a very simple secret key to use!".to_string();
+
+                shield_policy.syscall_interceptor_config.enable = true;
+                shield_policy.syscall_interceptor_config.syscalls = [18446744073709551615,18446744073709551615,18446744073709551615,18446744073709551615,18446744073709551615,7935,18446742974197923840,15];
             }
 
             info!("before policy_provisioning");
             policy_provisioning(&shield_policy).unwrap();
             info!("after policy_provisioning");
 
-            // TODO: when guest_syscall_interceptor is added
-            // guest_syscall_interceptor::syscall_interceptor_init(shield_policy.syscall_interceptor_config.clone()).unwrap();
+            guest_syscall_interceptor::syscall_interceptor_init(shield_policy.syscall_interceptor_config.clone()).unwrap();
 
             // TODO: when secret_injector is added
             // {
@@ -398,8 +400,7 @@ pub fn Load(
 
         // attestation, panic if attestation failed
         // secret injection
-        // TODO: when guest_syscall_interceptor is added
-        // guest_syscall_interceptor::syscall_interceptor_set_app_pid(task.Thread().ThreadGroup().ID()).unwrap();
+        guest_syscall_interceptor::syscall_interceptor_set_app_pid(task.Thread().ThreadGroup().ID()).unwrap();
 
         // TODO: when secret_injector is added
         // file based secret injection
