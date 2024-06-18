@@ -45,10 +45,10 @@ kernel_debug:
 	CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) build --target $(arch)-qkernel.json
 
 cc_kernel:
-	CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) build --target $(arch)-qkernel.json --release --features cc
+	RUSTFLAGS="--cfg aes_force_soft --cfg polyval_force_soft --cfg log" CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) build --target $(arch)-qkernel.json --release --features cc
 
 cc_kernel_debug:
-	CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) build --target $(arch)-qkernel.json --features cc
+	RUSTFLAGS="--cfg aes_force_soft --cfg polyval_force_soft --cfg log" CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) build --target $(arch)-qkernel.json --features cc
 
 ../build/arch/$(arch)/%.o: src/qlib/kernel/arch/$(arch)/%.s
 	@mkdir -p $(shell dirname $@)

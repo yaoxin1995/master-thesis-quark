@@ -66,7 +66,6 @@ use super::qlib::addr::Addr;
 use super::qlib::common::{Error, Result};
 use super::qlib::control_msg::*;
 use super::qlib::kernel::SignalProcess;
-use super::qlib::linux::membarrier::*;
 use super::qlib::linux_def::*;
 use super::qlib::pagetable::PageTables;
 use super::qlib::pagetable::PageTableFlags;
@@ -2038,9 +2037,9 @@ impl VMSpace {
     pub fn HostMemoryBarrier() -> i64 {
         let haveMembarrierPrivateExpedited = VMS.lock().haveMembarrierPrivateExpedited;
         let cmd = if haveMembarrierPrivateExpedited {
-            MEMBARRIER_CMD_PRIVATE_EXPEDITED
+            super::qlib::linux::membarrier::MEMBARRIER_CMD_PRIVATE_EXPEDITED
         } else {
-            MEMBARRIER_CMD_GLOBAL
+            super::qlib::linux::membarrier::MEMBARRIER_CMD_GLOBAL
         };
 
         return Self::Membarrier(cmd) as _;
@@ -2048,7 +2047,7 @@ impl VMSpace {
 
     //return (haveMembarrierGlobal, haveMembarrierPrivateExpedited)
     pub fn MembarrierInit() -> (bool, bool) {
-        let supported = Self::Membarrier(MEMBARRIER_CMD_QUERY);
+        let supported = Self::Membarrier(super::qlib::linux::membarrier::MEMBARRIER_CMD_QUERY);
         if supported < 0 {
             return (false, false);
         }
@@ -2062,13 +2061,13 @@ impl VMSpace {
         // grace period to elapse without bothering other CPUs.
         // MEMBARRIER_CMD_PRIVATE_EXPEDITED sends IPIs only to CPUs running tasks
         // sharing the caller's MM.)
-        if supported & MEMBARRIER_CMD_GLOBAL != 0 {
+        if supported & super::qlib::linux::membarrier::MEMBARRIER_CMD_GLOBAL != 0 {
             haveMembarrierGlobal = true;
         }
 
-        let req = MEMBARRIER_CMD_PRIVATE_EXPEDITED | MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED;
+        let req = super::qlib::linux::membarrier::MEMBARRIER_CMD_PRIVATE_EXPEDITED | super::qlib::linux::membarrier::MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED;
         if supported & req == req {
-            let ret = Self::Membarrier(MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED);
+            let ret = Self::Membarrier(super::qlib::linux::membarrier::MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED);
             if ret >= 0 {
                 haveMembarrierPrivateExpedited = true;
             }

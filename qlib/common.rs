@@ -461,6 +461,8 @@ pub enum Error {
 
     StdIOErr(String),
     UUidError(String),
+
+    NotSupport,
 }
 
 impl Error {

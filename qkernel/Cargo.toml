@@ -19,6 +19,8 @@ serde_derive = { version = "1.0.106", default-features = false}
 scopeguard = { version = "^1.1.0", default-features = false }
 enum_dispatch = { git = "https://github.com/QuarkContainer/enum_dispatch_clone.git" }
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_trace"] }
+getrandom = { version = "0.2", features = ["rdrand"] }
+aes-gcm = "0.10.1"
 
 [features]
 cc = []

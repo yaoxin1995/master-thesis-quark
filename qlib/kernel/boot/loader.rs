@@ -48,6 +48,8 @@ use super::fs::*;
 use crate::GUEST_KERNEL;
 #[cfg(feature = "cc")]
 use crate::qlib::kernel::Kernel::is_cc_enabled;
+#[cfg(feature = "cc")]
+use crate::shield::{APPLICATION_INFO_KEEPER};
 
 impl Process {
     pub fn TaskCaps(&self) -> TaskCaps {
@@ -340,6 +342,16 @@ impl Loader {
     }
 
     pub fn StartSubContainer(&self, processSpec: Process) -> Result<(i32, u64, u64, u64)> {
+        info!("application_info_keeper 0");
+        #[cfg(feature = "cc")]
+        {
+            if is_cc_enabled(){
+                info!("application_info_keeper 1");
+                let mut application_info_keeper = APPLICATION_INFO_KEEPER.write();
+                application_info_keeper.init(&processSpec.Envs, processSpec.ID.clone()).unwrap();
+            }
+        }
+        
         let task = Task::Current();
         let mut lockedLoader = self.Lock(task)?;
         let kernel = lockedLoader.kernel.clone();
