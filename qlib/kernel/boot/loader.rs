@@ -342,11 +342,9 @@ impl Loader {
     }
 
     pub fn StartSubContainer(&self, processSpec: Process) -> Result<(i32, u64, u64, u64)> {
-        info!("application_info_keeper 0");
         #[cfg(feature = "cc")]
         {
             if is_cc_enabled(){
-                info!("application_info_keeper 1");
                 let mut application_info_keeper = APPLICATION_INFO_KEEPER.write();
                 application_info_keeper.init(&processSpec.Envs, processSpec.ID.clone()).unwrap();
             }

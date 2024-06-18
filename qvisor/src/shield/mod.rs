@@ -1,3 +1,6 @@
+pub mod guest_syscall_interceptor;
+
+
 use spin::rwlock::RwLock;
 use crate::qlib::common::*;
 use crate::qlib::shield_policy::*;
