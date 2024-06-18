@@ -62,6 +62,11 @@ extern crate sha2;
 #[cfg(feature = "cc")]
 extern crate base64ct;
 
+#[cfg(feature = "cc")]
+extern crate aes_gcm;
+#[cfg(feature = "cc")]
+extern crate getrandom;
+
 use core::panic::PanicInfo;
 use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use core::{mem, ptr};
@@ -124,12 +129,17 @@ use self::syscalls::syscalls::*;
 use self::task::*;
 use self::threadmgr::task_sched::*;
 
+#[cfg(feature = "cc")]
+use self::qlib::mem::cc_allocator::*;
+#[cfg(feature = "cc")]
+use alloc::boxed::Box;
+#[cfg(feature = "cc")]
+use memmgr::pma::PageMgr;
+#[cfg(feature = "cc")]
+use shield::init_shielding_layer;
 #[macro_use]
 mod print;
 
-//#[macro_use]
-//pub mod asm;
-//mod taskMgr;
 #[macro_use]
 mod qlib;
 #[macro_use]
@@ -149,6 +159,11 @@ cfg_cc! {
     use alloc::boxed::Box;
     use memmgr::pma::PageMgr;
 }
+
+#[cfg(feature = "cc")]
+mod shield;
+
+
 
 #[global_allocator]
 pub static VCPU_ALLOCATOR: GlobalVcpuAllocator = GlobalVcpuAllocator::New();
@@ -246,6 +261,13 @@ pub fn SingletonInit() {
         task::InitSingleton();
 
         qlib::InitSingleton();
+
+        #[cfg(feature = "cc")]
+        if is_cc_enabled(){
+            init_shielding_layer();
+        } 
+
+
     }
 }
 

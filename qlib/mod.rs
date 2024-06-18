@@ -101,6 +101,8 @@ pub mod unix_socket;
 
 #[cfg (feature = "cc")]
 pub mod cc;
+#[cfg(feature = "cc")]
+pub mod shield_policy;
 
 use self::kernel::dns::dns_svc::DnsSvc;
 use self::mutex::*;
