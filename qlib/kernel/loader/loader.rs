@@ -35,6 +35,17 @@ use super::elf::*;
 //use super::super::memmgr::mm::*;
 use super::interpreter::*;
 
+#[cfg(feature = "cc")]
+use crate::qlib::shield_policy::*;
+#[cfg(feature = "cc")]
+use crate::shield::{//secret_injection::SECRET_KEEPER, 
+    //software_measurement_manager, https_attestation_provisioning_cli, 
+    policy_provisioning,
+    APPLICATION_INFO_KEEPER, 
+    //guest_syscall_interceptor
+    };
+
+
 // maxLoaderAttempts is the maximum number of attempts to try to load
 // an interpreter scripts, to prevent loops. 6 (initial + 5 changes) is
 // what the Linux kernel allows (fs/exec.c:search_binary_handler).
@@ -269,14 +280,186 @@ pub fn CreateStack(task: &Task) -> Result<Range> {
 
 pub const TASK_COMM_LEN: usize = 16;
 
+
 // Load loads file with filename into memory.
 //return (entry: u64, usersp: u64, kernelsp: u64)
+#[cfg(feature = "cc")]
 pub fn Load(
     task: &mut Task,
     filename: &str,
     argv: &mut Vec<String>,
-    envv: &[String],
+    envv: &mut Vec<String>,
     extraAuxv: &[AuxEntry],
+    isSubContainer: bool
+) -> Result<(u64, u64, u64)> {
+    let vdsoAddr = LoadVDSO(task)?;
+
+    let mut name = Base(&filename);
+    if name.len() > TASK_COMM_LEN - 1 {
+        name = &name[0..TASK_COMM_LEN - 1];
+    }
+
+    let app_name;
+    let app_loaded;
+    {
+        let app_info_keeper = APPLICATION_INFO_KEEPER.read();
+
+        app_name = app_info_keeper.get_application_name().unwrap().to_string();
+        app_loaded = app_info_keeper.is_application_loaded().unwrap();
+    }
+
+
+    info!("start load isSubContainer {:?}, file name {:?} is mongond {:?}, argv {:?}, envv {:?}", isSubContainer, filename, filename.eq("/usr/bin/mongod"), argv, envv);
+
+    let (loaded, executable, tmpArgv) = LoadExecutable(task, filename, argv)?;
+    let mut argv = tmpArgv;
+
+    let e = Addr(loaded.end).RoundUp()?.0;
+
+    task.mm.BrkSetup(e);
+    task.mm.SetExecutable(&executable);
+
+
+    task.thread.as_ref().unwrap().lock().name = name.to_string();
+
+    let stackRange = CreateStack(task)?;
+
+    let mut stack = Stack::New(stackRange.End());
+
+    // TODO: enable when software manager is added
+    // let software_measurement;
+    {   
+
+        // let mut measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+        // while !measurement_manager.is_some() {
+        //     measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+        // }
+
+        // let mut measurement_manager = measurement_manager.unwrap();
+
+        // let res = measurement_manager.check_before_app_starts( app_name.eq(name), filename);
+        // if res.is_err() {
+        //     info!("Loadmeasurement_manager.measure_stack got error {:?}", res);
+        //     return Err(res.err().unwrap());
+        // }
+        // software_measurement = measurement_manager.get_measurement().unwrap();
+    }
+
+
+
+    info!("Load app_name {:?}, name {:?}, app_loaded {:?}, process id {:?}", app_name, name, app_loaded, task.Thread().ThreadGroup().ID());
+      
+
+    if app_name.eq(name){
+        debug!("Load attestation begin");
+
+        // trigger remote attestation and secret provisioning when the kernel is going to launch application binary first time
+        // skip if application is restarted
+        if !app_loaded {
+
+            // TODO: when https_attestation_provisioning_cli is added
+            // let res = https_attestation_provisioning_cli::provisioning_http_client(task, &software_measurement);
+            // if res.is_err() {
+            //     info!("https_attestation_provisioning_cli::provisioning_http_client(task) got error {:?}", res);
+            //     return Err(res.err().unwrap());
+            // }
+    
+            // let (shield_policy, secret) = res.unwrap();
+            // updata the policy
+
+            let mut shield_policy = KbsPolicy::default();
+            
+
+            // TEST
+            {
+                shield_policy.qkernel_log_config.enable = true;
+                shield_policy.qkernel_log_config.allowed_max_log_level = QkernelDebugLevel::Off;
+                shield_policy.privileged_user_key_slice = "a very simple secret key to use!".to_string();
+            }
+
+            info!("before policy_provisioning");
+            policy_provisioning(&shield_policy).unwrap();
+            info!("after policy_provisioning");
+
+            // TODO: when guest_syscall_interceptor is added
+            // guest_syscall_interceptor::syscall_interceptor_init(shield_policy.syscall_interceptor_config.clone()).unwrap();
+
+            // TODO: when secret_injector is added
+            // {
+            //     let mut secret_injector =  SECRET_KEEPER.write();
+    
+            //     let res = secret_injector.bookkeep_secrets(secret.clone());
+            //     if res.is_err() {
+            //         info!("Load: failed to call file_based_secret_injection");
+            //     }
+            // }
+        }
+
+
+        // attestation, panic if attestation failed
+        // secret injection
+        // TODO: when guest_syscall_interceptor is added
+        // guest_syscall_interceptor::syscall_interceptor_set_app_pid(task.Thread().ThreadGroup().ID()).unwrap();
+
+        // TODO: when secret_injector is added
+        // file based secret injection
+        // let env_arg_secret;
+        // {
+        //     let secret_injector = SECRET_KEEPER.read();
+        //     let res = secret_injector.inject_file_based_secret_to_secret_file_system(task);
+        //     env_arg_secret= secret_injector.arg_env_based_secrets.clone();
+
+        //     if res.is_err() {
+        //         info!("Load: failed to set up file system for secrets on guest memory");
+        //     }
+        // }
+
+        // TODO: when secret_injector is added
+        // env based secret injection
+        // if env_arg_secret.is_some() {
+
+        //     let cmd_envs = env_arg_secret.as_ref().unwrap();
+        //     let mut env_secrets = cmd_envs.env_variables.clone();
+        //     envv.append(&mut env_secrets);
+    
+        //     // app args based secret injection
+        //     let mut arg_secrets = cmd_envs.cmd_arg.clone();
+        //     argv.append(&mut arg_secrets);
+
+        // }
+
+        {
+            let mut  app_info_keeper = APPLICATION_INFO_KEEPER.write();
+            app_info_keeper.set_application_loaded().unwrap();
+        }
+
+        debug!("secret injection finished, envv {:?}, args {:?}", envv, argv);
+    }
+    
+    let usersp = SetupUserStack(
+        task, &mut stack, &loaded, filename, &argv, envv, extraAuxv, vdsoAddr,
+    )?;
+
+
+    let kernelsp = Task::PrivateTaskID() + MemoryDef::DEFAULT_STACK_SIZE - 0x10;
+    let entry = loaded.entry;
+
+    error!("LOAD finished");
+    return Ok((entry, usersp, kernelsp));
+}
+
+
+
+// Load loads file with filename into memory.
+//return (entry: u64, usersp: u64, kernelsp: u64)
+#[cfg(not(feature = "cc"))]
+pub fn Load(
+    task: &mut Task,
+    filename: &str,
+    argv: &mut Vec<String>,
+    envv: &mut Vec<String>,
+    extraAuxv: &[AuxEntry],
+    _isSubContainer: bool
 ) -> Result<(u64, u64, u64)> {
     let vdsoAddr = LoadVDSO(task)?;
     task.mm.SetUserVDSOBase(vdsoAddr);
@@ -303,11 +486,10 @@ pub fn Load(
     let usersp = SetupUserStack(
         task, &mut stack, &loaded, filename, &argv, envv, extraAuxv, vdsoAddr,
     )?;
-    #[cfg(not(feature = "cc"))]
+
     let kernelsp = Task::TaskId().Addr() + MemoryDef::DEFAULT_STACK_SIZE - 0x10;
-    #[cfg(feature = "cc")]
-    let kernelsp = Task::PrivateTaskID() + MemoryDef::DEFAULT_STACK_SIZE - 0x10;
     let entry = loaded.entry;
+
 
     return Ok((entry, usersp, kernelsp));
 }

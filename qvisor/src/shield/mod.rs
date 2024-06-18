@@ -1,5 +1,6 @@
 use spin::rwlock::RwLock;
 use crate::qlib::common::*;
+use crate::qlib::shield_policy::*;
 
 lazy_static! {
     pub static ref APPLICATION_INFO_KEEPER:  RwLock<ApplicationInfoKeeper> = RwLock::new(ApplicationInfoKeeper::default());
@@ -43,4 +44,8 @@ impl ApplicationInfoKeeper {
     pub fn get_application_name (&self) -> Result<&str> {
         Err(Error::NotSupport)
     }
+}
+
+pub fn policy_provisioning (_policy: &KbsPolicy) -> Result<()> {
+    Err(Error::NotSupport)
 }

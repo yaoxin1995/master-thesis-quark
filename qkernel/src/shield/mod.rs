@@ -1,3 +1,5 @@
+pub mod qkernel_log_magager;
+
 
 use crate::aes_gcm::{ Aes256Gcm, Key};
 use alloc::{vec::Vec, string::String};
@@ -156,4 +158,19 @@ pub fn init_shielding_layer () ->() {
 
     let encryption_key = Key::<Aes256Gcm>::from_slice(KEY_SLICE).clone();
     info!("init_shielding_layer init shielding layer use default policy:{:?}" ,default_policy);
+
+    qkernel_log_magager::qlog_magager_init().unwrap();
+}
+
+
+
+pub fn policy_provisioning (policy: &KbsPolicy) -> Result<()> {
+
+    info!("policy_provisioning init shielding layer use  policy:{:?} from kbs" ,policy);
+    let key_slice = policy.privileged_user_key_slice.as_bytes();
+    let encryption_key = Key::<Aes256Gcm>::from_slice(key_slice).clone();
+
+    qkernel_log_magager::qlog_magager_update(&policy.qkernel_log_config).unwrap();
+    info!("policy_provisioning init shielding layer");
+    Ok(())
 }
