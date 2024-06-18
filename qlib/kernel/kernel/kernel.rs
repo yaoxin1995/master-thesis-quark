@@ -452,8 +452,9 @@ impl Kernel {
     pub fn LoadProcess(
         &self,
         fileName: &str,
-        envs: &Vec<String>,
+        envs: &mut Vec<String>,
         args: &mut Vec<String>,
+        isSubContainer: bool
     ) -> Result<(u64, u64, u64)> {
         info!(
             "LoadProcess filename: {:?} envs: {:?}, args: {:?}",
@@ -478,7 +479,7 @@ impl Kernel {
         assert!(threads.len() == 1, "ThreadGroup start has multiple threads");*/
 
         let task = Task::Current();
-        return Load(task, fileName, args, envs, &Vec::new());
+        return Load(task, fileName, args, envs, &Vec::new(), isSubContainer);
 
         //return Thread::Start(fileName, envs, args);
     }

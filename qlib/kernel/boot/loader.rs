@@ -247,7 +247,7 @@ impl Loader {
             &paths,
         )?;
         let (entry, userStackAddr, kernelStackAddr) =
-            kernel.LoadProcess(&procArgs.Filename, &procArgs.Envv, &mut procArgs.Argv)?;
+            kernel.LoadProcess(&procArgs.Filename, &mut procArgs.Envv, &mut procArgs.Argv, false)?;
         return Ok((tid, entry, userStackAddr, kernelStackAddr));
     }
 
@@ -311,7 +311,7 @@ impl Loader {
         );
 
         let (entry, userStackAddr, kernelStackAddr) =
-            kernel.LoadProcess(&procArgs.Filename, &procArgs.Envv, &mut procArgs.Argv)?;
+            kernel.LoadProcess(&procArgs.Filename, &mut procArgs.Envv, &mut procArgs.Argv, false)?;
         return Ok((tid, entry, userStackAddr, kernelStackAddr));
     }
 
@@ -447,8 +447,9 @@ impl Loader {
         )?;
         let (entry, userStackAddr, kernelStackAddr) = kernel.LoadProcess(
             &createProcessArgs.Filename,
-            &createProcessArgs.Envv,
+            &mut createProcessArgs.Envv,
             &mut createProcessArgs.Argv,
+            true
         )?;
         return Ok((tid, entry, userStackAddr, kernelStackAddr));
     }
