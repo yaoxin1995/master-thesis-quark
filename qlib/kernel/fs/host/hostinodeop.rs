@@ -55,6 +55,10 @@ use super::*;
 #[cfg(feature = "cc")]
 use crate::qlib::kernel::Kernel::is_cc_enabled;
 
+#[cfg(feature = "cc")]
+use crate::shield::{exec_shield::*, inode_tracker::*};
+
+
 pub struct MappableInternal {
     //addr mapping from file offset to physical address
     pub f2pmap: BTreeMap<u64, u64>,
@@ -901,12 +905,43 @@ impl HostInodeOp {
         }
 
         let mut buf = DataBuff::New(size);
-        let len = task.CopyDataInFromIovs(&mut buf.buf, srcs, true)?;
-        let iovs = buf.Iovs(len);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "cc")] {
+                let mut len = task.CopyDataInFromIovs(&mut buf.buf, srcs, true)?;
+                let mut iovs = buf.Iovs(len);
+            } else  {
+                let len = task.CopyDataInFromIovs(&mut buf.buf, srcs, true)?;
+                let iovs = buf.Iovs(len);
+            }
+        }
+
 
         let inodeType = self.InodeType();
 
+
         if inodeType != InodeType::RegularFile && inodeType != InodeType::CharacterDevice {
+            
+            #[cfg(feature = "cc")]
+            if is_cc_enabled() {
+                let stdout_shiled_readlocked = STDOUT_EXEC_RESULT_SHIELD.read();
+                let old_len = len;
+                let inode_id = _f.Dirent.inode.ID();
+                if inodeType == InodeType::Pipe {
+                    buf = stdout_shiled_readlocked.encrypNormalIOStdouterr(buf, inode_id).unwrap();
+                    len = buf.Len();
+                }
+                iovs = buf.Iovs(len);
+
+                let mut ret = IOWrite(hostIops.HostFd(), &iovs)?;
+
+                if ret == len as i64 {
+                    ret = old_len as i64;
+                }
+                
+                info!("ok {:?}, ret {:?}, len:{:?}, old_len {:?}", inode_id, ret, len, old_len);
+                return Ok(ret as i64);
+            }
+
             let ret = IOWrite(hostIops.HostFd(), &iovs)?;
             return Ok(ret as i64);
         } else {

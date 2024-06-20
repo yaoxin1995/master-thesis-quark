@@ -64,6 +64,11 @@ use core::sync::atomic::AtomicU64;
 use crate::{GLOBAL_ALLOCATOR, IS_GUEST};
 #[cfg(feature = "cc")]
 use Kernel::is_cc_enabled;
+#[cfg(feature = "cc")]
+use crate::qlib::control_msg::StartArgs;
+#[cfg(feature = "cc")]
+use crate::qlib::shield_policy::*;
+
 
 const DEFAULT_STACK_SIZE: usize = MemoryDef::DEFAULT_STACK_SIZE as usize;
 pub const DEFAULT_STACK_PAGES: u64 = DEFAULT_STACK_SIZE as u64 / (4 * 1024);
@@ -569,6 +574,7 @@ impl Task {
         return ret;
     }
 
+    #[cfg(not(feature = "cc"))]
     pub fn NewStdFds(&mut self, stdfds: &[i32], isTTY: bool) -> Result<()> {
         for i in 0..stdfds.len() {
             let file = self.NewFileFromHostStdioFd(i as i32, stdfds[i], isTTY)?;
@@ -578,9 +584,41 @@ impl Task {
         return Ok(());
     }
 
-    pub fn NewFileFromHostStdioFd(&mut self, fd: i32, hostfd: i32, isTTY: bool) -> Result<File> {
+    #[cfg(feature = "cc")]
+    pub fn NewStdFds(&mut self, stdfds: &[i32], isTTY: bool, stdioArgs: StdioArgs) -> Result<()> {
+
+        assert!(stdfds.len() == 3);
+        for i in 0..stdfds.len() {
+            let file;
+            if i == 0 {
+                file = self.NewFileFromHostStdioFd(i as i32, stdfds[i], isTTY, TrackInodeType::Stdin(stdioArgs.clone()))?;
+            } else if i == 1 {
+                file = self.NewFileFromHostStdioFd(i as i32, stdfds[i], isTTY, TrackInodeType::Stdout(stdioArgs.clone()))?;
+            } else {
+                file = self.NewFileFromHostStdioFd(i as i32, stdfds[i], isTTY, TrackInodeType::Stderro(stdioArgs.clone()))?;
+            }
+                
+            file.flags.lock().0.NonBlocking = false; //need to clean the stdio nonblocking
+        }
+
+        return Ok(());
+    }
+
+    pub fn NewFileFromHostStdioFd(
+        &mut self, 
+        fd: i32, 
+        hostfd: i32, 
+        isTTY: bool,
+        #[cfg(feature = "cc")]
+        inodeType: TrackInodeType
+    ) -> Result<File> {
         let fileOwner = self.FileOwner();
+
+        #[cfg(feature = "cc")]
+        let file = File::NewFileFromFd(self, hostfd, &fileOwner, true, isTTY, inodeType)?;
+        #[cfg(not(feature = "cc"))]
         let file = File::NewFileFromFd(self, hostfd, &fileOwner, true, isTTY)?;
+
         self.NewFDAt(fd, &Arc::new(file.clone()), &FDFlags::default())?;
         return Ok(file);
     }

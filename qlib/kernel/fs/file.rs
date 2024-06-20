@@ -81,6 +81,13 @@ use crate::qlib::kernel::socket::hostinet::socket::SocketOperations;
 use crate::qlib::kernel::socket::hostinet::uring_socket::UringSocketOperations;
 use crate::qlib::kernel::socket::unix::unix::UnixSocketOperations;
 
+#[cfg(feature = "cc")]
+use crate::shield::inode_tracker::INODE_TRACKER;
+#[cfg(feature = "cc")]
+use crate::qlib::shield_policy::TrackInodeType;         
+#[cfg(feature = "cc")]
+use crate::qlib::kernel::Kernel::is_cc_enabled;
+
 use super::attr::*;
 use super::dirent::*;
 //use super::flags::*;
@@ -664,6 +671,8 @@ impl File {
         mounter: &FileOwner,
         stdio: bool,
         isTTY: bool,
+        #[cfg(feature = "cc")]
+        inodeType: TrackInodeType
     ) -> Result<Self> {
         let mut fstat = LibcStat::default();
 
@@ -728,6 +737,11 @@ impl File {
                     let fops = hostiops.GetHostFileOp(task);
                     let wouldBlock = inode.lock().InodeOp.WouldBlock();
 
+                    #[cfg(feature = "cc")]
+                    if is_cc_enabled(){
+                        let key = inode.ID();
+                        INODE_TRACKER.write().addInoteToTrack(key, inodeType);
+                    } 
                     if isTTY {
                         return Ok(Self::NewTTYFile(&dirent, &fileFlags, fops));
                     }

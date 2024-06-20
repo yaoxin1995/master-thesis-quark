@@ -74,6 +74,10 @@ use crate::qlib::kernel::fs::tty::slave::SlaveInodeOperations;
 use crate::qlib::kernel::kernel::pipe::node::PipeIops;
 use crate::qlib::kernel::socket::unix::unix::UnixSocketInodeOps;
 
+#[cfg(feature = "cc")]
+use crate::shield::inode_tracker::*;
+
+
 pub fn ContextCanAccessFile(task: &Task, inode: &Inode, reqPerms: &PermMask) -> Result<bool> {
     let creds = task.creds.clone();
     let uattr = inode.UnstableAttr(task)?;
@@ -395,6 +399,28 @@ impl Deref for Inode {
 
     fn deref(&self) -> &Arc<QMutex<InodeIntern>> {
         &self.0
+    }
+}
+
+#[cfg(feature = "cc")]
+impl Drop for Inode {
+    fn drop(&mut self) {
+        if Arc::strong_count(&self.0) == 1 {
+
+            let inodeId = self.0.lock().UniqueId;
+            debug!("Drop inode id {:?}, strong count: {:?}, weak count: {:?}", inodeId, Arc::strong_count(&self.0), Arc::weak_count(&self.0));
+            {
+                let mut checker_locked = INODE_TRACKER.try_write();
+                while !checker_locked.is_some() {
+                    checker_locked = INODE_TRACKER.try_write();
+                }
+
+                let mut checker = checker_locked.unwrap();
+                if checker.isInodeExist(&inodeId) {
+                    checker.rmInoteToTrack(inodeId);
+                }
+            }
+        }
     }
 }
 

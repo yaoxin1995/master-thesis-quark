@@ -1,5 +1,8 @@
 pub mod qkernel_log_magager;
 pub mod guest_syscall_interceptor;
+mod cryptographic_utilities;
+pub mod exec_shield;
+pub mod inode_tracker;
 
 use crate::aes_gcm::{ Aes256Gcm, Key};
 use alloc::{vec::Vec, string::String};
@@ -9,6 +12,10 @@ use alloc::string::ToString;
 use core::convert::TryInto;
 use qlib::shield_policy::KbsPolicy;
 use crate::shield::guest_syscall_interceptor::syscall_interceptor_policy_update;
+use crate::shield::exec_shield::{EXEC_AUTH_AC, STDOUT_EXEC_RESULT_SHIELD, ExecAthentityAcChekcer};
+use spin::rwlock::RwLockWriteGuard;
+use self::exec_shield::*;
+use self::inode_tracker::*;
 
 lazy_static! {
     pub static ref APPLICATION_INFO_KEEPER:  RwLock<ApplicationInfoKeeper> = RwLock::new(ApplicationInfoKeeper::default());
@@ -160,9 +167,23 @@ pub fn init_shielding_layer () ->() {
     let encryption_key = Key::<Aes256Gcm>::from_slice(KEY_SLICE).clone();
     info!("init_shielding_layer init shielding layer use default policy:{:?}" ,default_policy);
 
+    // TODO
+    // let mut termianl_shield = TERMINAL_SHIELD.write();
+    // termianl_shield.init(&default_policy, &encryption_key);
+
+
+    let mut inode_tracker = INODE_TRACKER.write();
+    inode_tracker.init();
+
+    let mut exec_access_control = EXEC_AUTH_AC.write();
+    exec_access_control.init(&KEY_SLICE.to_vec(), &encryption_key, &default_policy);
+
+    let mut stdout_exec_result_shield = STDOUT_EXEC_RESULT_SHIELD.write();
+    stdout_exec_result_shield.init(&default_policy, &encryption_key);
+
+
     qkernel_log_magager::qlog_magager_init().unwrap();
 }
-
 
 
 pub fn policy_provisioning (policy: &KbsPolicy) -> Result<()> {
@@ -171,7 +192,106 @@ pub fn policy_provisioning (policy: &KbsPolicy) -> Result<()> {
     let key_slice = policy.privileged_user_key_slice.as_bytes();
     let encryption_key = Key::<Aes256Gcm>::from_slice(key_slice).clone();
 
+    //TODO: termianl_shield
+    // {
+    //     let mut termianl_shield = TERMINAL_SHIELD.try_write();
+    //     while !termianl_shield.is_some() {
+    //         termianl_shield = TERMINAL_SHIELD.try_write();
+    //     }
+
+    //     let mut termianl_shield = termianl_shield.unwrap();
+
+    //     termianl_shield.init(policy, &encryption_key);
+
+    // }
+
+
+    {
+        let mut exec_access_control = EXEC_AUTH_AC.try_write();
+        while !exec_access_control.is_some() {
+            exec_access_control = EXEC_AUTH_AC.try_write();
+        }
+
+        let mut exec_access_control = exec_access_control.unwrap();
+
+        exec_access_control.init(&key_slice.to_vec(), &encryption_key, policy);
+
+    }
+
+
+    {
+        let mut stdout_exec_result_shield = STDOUT_EXEC_RESULT_SHIELD.try_write();
+        while !stdout_exec_result_shield.is_some() {
+            stdout_exec_result_shield = STDOUT_EXEC_RESULT_SHIELD.try_write();
+        }
+
+        let mut stdout_exec_result_shield = stdout_exec_result_shield.unwrap();
+
+        stdout_exec_result_shield.init(policy, &encryption_key);
+
+    }
+
+
+    // TODO
+    // {
+    //     let mut measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+    //     while !measurement_manager.is_some() {
+    //         measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+    //     }
+
+    //     let mut measurement_manager = measurement_manager.unwrap();
+
+
+    //     measurement_manager.init(&policy.enclave_mode, &policy.runtime_reference_measurements).unwrap();
+    // }
+
+
     qkernel_log_magager::qlog_magager_update(&policy.qkernel_log_config).unwrap();
-    info!("policy_provisioning init shielding layer");
+
+    Ok(())
+}
+
+
+
+
+
+
+pub fn policy_update (new_policy: &KbsPolicy,  exec_ac: &mut RwLockWriteGuard<ExecAthentityAcChekcer>) -> Result<()> {
+
+    info!("policy_update shielding layer use  policy:{:?} from secure client" ,new_policy);  
+
+    let key_slice = new_policy.privileged_user_key_slice.as_bytes();
+    let encryption_key = Key::<Aes256Gcm>::from_slice(key_slice).clone();
+
+    //TODO termianl_shield
+    // {
+    //     let mut termianl_shield = TERMINAL_SHIELD.try_write();
+    //     while !termianl_shield.is_some() {
+    //         termianl_shield = TERMINAL_SHIELD.try_write();
+    //     }
+
+    //     let mut termianl_shield = termianl_shield.unwrap();
+
+    //     termianl_shield.init(new_policy, &encryption_key);
+
+    // }
+
+    exec_ac.update(&key_slice.to_vec(), &encryption_key, new_policy);
+    {
+        let mut stdout_exec_result_shield = STDOUT_EXEC_RESULT_SHIELD.try_write();
+        while !stdout_exec_result_shield.is_some() {
+            stdout_exec_result_shield = STDOUT_EXEC_RESULT_SHIELD.try_write();
+        }
+
+        let mut stdout_exec_result_shield = stdout_exec_result_shield.unwrap();
+
+        stdout_exec_result_shield.init(new_policy, &encryption_key);
+
+    }
+
+    syscall_interceptor_policy_update(&new_policy.syscall_interceptor_config).unwrap();
+
+    qkernel_log_magager::qlog_magager_update(&new_policy.qkernel_log_config).unwrap();
+
     Ok(())
 }

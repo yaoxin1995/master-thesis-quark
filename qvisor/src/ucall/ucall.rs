@@ -38,6 +38,8 @@ pub enum UCallReq {
     ContainerDestroy(Cid),
     CreateSubContainer(CreateArgs),
     StartSubContainer(StartArgs),
+    #[cfg(feature = "cc")]
+    ExecAthenAcCheck(ExecAuthenAcCheckArgs),
     WaitAll,
 }
 

@@ -50,11 +50,20 @@ extern crate spin;
 #[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 extern crate xmas_elf;
+extern crate cfg_if;
 
 #[cfg(feature = "cc")]
 extern crate aes_gcm;
 #[cfg(feature = "cc")]
 extern crate getrandom;
+#[cfg(feature = "cc")]
+extern crate sha2;
+#[cfg(feature = "cc")]
+extern crate hmac;
+#[cfg(feature = "cc")]
+extern crate base64ct;
+#[cfg(feature = "cc")]
+extern crate postcard;
 
 use core::panic::PanicInfo;
 use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
@@ -737,7 +746,20 @@ fn IoHanlder() {
 }
 
 fn StartExecProcess(fd: i32, process: Process) -> ! {
-    let (tid, entry, userStackAddr, kernelStackAddr) = { LOADER.ExecProcess(process).unwrap() };
+    let (tid, entry, userStackAddr, kernelStackAddr) = {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "cc")] {
+                if is_cc_enabled() {
+                    LOADER.ExecProcess_CC(process, fd).unwrap()
+                } else {
+                    LOADER.ExecProcess(process).unwrap()
+                } 
+            } else  {
+                LOADER.ExecProcess(process).unwrap()
+            }
+        }
+    
+    };
 
     {
         WriteControlMsgResp(fd, &UCallResp::ExecProcessResp(tid), true);

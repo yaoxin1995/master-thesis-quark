@@ -298,12 +298,11 @@ impl VirtualMachine {
             CCMode::None => return Self::Init(args),
             #[cfg(feature = "cc")]
             CCMode::Normal => {
-                ENABLE_CC.store(true,Ordering::Release);
                 return Self::InitNormalCC(args, CCMode::Normal);
             }
             #[cfg(feature = "cc")]
             CCMode::NormalEmu => {
-                ENABLE_CC.store(true,Ordering::Release);
+
                 IDENTICAL_MAPPING.store(false,Ordering::Release);
                 return Self::InitNormalCC(args, CCMode::NormalEmu);
             }

@@ -1164,6 +1164,41 @@ impl Container {
         }
         return ret;
     }
+
+    #[cfg(feature = "cc")]
+    pub fn exec_authentication_ac_check(&self, args: ExecAuthenAcCheckArgs) -> bool {
+        match self.Sandbox.as_ref().unwrap().SandboxConnect() {
+            Ok(client) => {
+                let ucall_req;
+                ucall_req = UCallReq::ExecAthenAcCheck(args.clone());
+            
+                let resp = client.Call(&ucall_req).expect(&format!("req_authentication_ac_check return error, req_type {:?}",  args.req_type));
+
+                let res = match resp {
+                    UCallResp::ExecAthenAcCheckResp(r) => r,
+                    _ => {
+                        error!("req_authentication_ac_check not support resp....");
+                        false
+                    },
+                };
+
+                info!("req_authentication_ac_check return {:?} for req {:?}", res , args.req_type);
+                return res;
+
+            }
+            //the container has exited
+            Err(Error::SysError(SysErr::ECONNREFUSED)) => {
+                info!("req_authentication_ac_check SandboxConnect: connect fail....");
+            }
+            Err(e) => {
+                info!("req_authentication_ac_check SandboxConnect: connect fail, error {:?}" ,e);
+            }
+            
+        }
+        false
+    }    
+
+
 }
 
 pub fn runInCgroup(cg: &Option<Cgroup>, mut f: impl FnMut() -> Result<()>) -> Result<()> {
