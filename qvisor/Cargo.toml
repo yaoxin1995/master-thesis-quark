@@ -62,6 +62,7 @@ io-uring = "0.6.3"
 sev = { git = "https://github.com/123abcpp/sev.git", branch = "quark_sev" }
 aes-gcm = "0.10.1"
 getrandom = { version = "0.2", features = ["rdrand"] }
+cfg-if = "0.1"
 
 [features]
 cuda = ["cuda-driver-sys", "cuda-runtime-sys", "libelf", "rcublas-sys", "cuda11-cublasLt-sys"]

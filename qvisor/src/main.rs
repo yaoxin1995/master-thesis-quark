@@ -62,6 +62,7 @@ extern crate tabwriter;
 
 #[cfg(feature = "cc")]
 extern crate aes_gcm;
+extern crate cfg_if;
 
 #[macro_use]
 pub mod print;
@@ -113,7 +114,10 @@ use self::vmspace::hostfdnotifier::*;
 use self::vmspace::kernel_io_thread::*;
 use crate::qlib::linux_def::MemoryDef;
 //use crate::qlib::mem::bitmap_allocator::BitmapAllocatorWrapper;
+#[cfg (feature = "cc")]
+use crate::qlib::kernel::Kernel::ENABLE_CC;
 
+use core::sync::atomic::Ordering;
 use self::vmspace::uringMgr::*;
 use crate::kvm_vcpu::KVMVcpu;
 use vmspace::*;
@@ -205,6 +209,22 @@ fn main() {
     InitSingleton();
 
     let cmd;
+
+    {
+        let cc_mode = QUARK_CONFIG.lock().CCMode;
+        match cc_mode {
+            CCMode::None => (),
+            #[cfg(feature = "cc")]
+            CCMode::Normal => {
+                ENABLE_CC.store(true,Ordering::Release);
+            }
+            #[cfg(feature = "cc")]
+            CCMode::NormalEmu => {
+                ENABLE_CC.store(true,Ordering::Release);
+            }
+            _ => panic!("CCMode not compiled!"),
+        }
+    }
 
     {
         let mut str = "".to_string();

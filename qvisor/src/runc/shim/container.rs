@@ -32,13 +32,20 @@ use nix::sys::stat::Mode;
 use nix::unistd::mkdir;
 use oci_spec::runtime::LinuxNamespaceType;
 use time::OffsetDateTime;
-
 use super::super::super::qlib::common::*;
 use super::super::super::runc::oci::LinuxResources;
 use super::super::cmd::config::*;
 use super::super::container::container::*;
 use super::container_io::*;
 use super::process::*;
+
+#[cfg(feature = "cc")]
+use crate::qlib::shield_policy::*;
+#[cfg(feature = "cc")]
+use crate::qlib::control_msg::*;
+#[cfg(feature = "cc")]
+use crate::qlib::kernel::Kernel::is_cc_enabled;
+
 
 #[derive(Clone, Default)]
 pub struct ContainerFactory {}
@@ -198,10 +205,57 @@ impl CommonContainer {
         Ok(resp)
     }
 
+
+
     pub fn exec(&mut self, req: ExecProcessRequest) -> Result<()> {
         let exec_id = req.exec_id.to_string();
         let mut exec_process =
             ExecProcess::try_from(req).map_err(|e| Error::Common(format!("{:?}", e)))?;
+
+        #[cfg(feature = "cc")]
+        {
+            info!("exec  is_cc_enabled {:?}", is_cc_enabled());
+            if is_cc_enabled() {
+                info!("exec  is_cc_enabled {:?} 1", is_cc_enabled());
+                let mut args = Vec::new();
+                for arg in &exec_process.spec.args {
+                    args.push(arg.clone());
+                }
+            
+                let mut envv = Vec::new();
+                for env in &exec_process.spec.env {
+                    envv.push(env.clone())
+                }
+                
+                let authentication_ac_check_req_args;
+                if exec_process.terminal() == true {
+                    authentication_ac_check_req_args = ExecAuthenAcCheckArgs {
+                        exec_id: exec_id.clone(),
+                        args: args,
+                        env: envv,
+                        cwd: exec_process.spec.cwd.clone(),
+                        req_type: ExecRequestType::Terminal,
+                    };
+                
+                }
+                else {
+                    authentication_ac_check_req_args = ExecAuthenAcCheckArgs {
+                        exec_id: exec_id.clone(),
+                        args: args,
+                        env: envv,
+                        cwd: exec_process.spec.cwd.clone(),
+                        req_type: ExecRequestType::SingleShotCmdMode,
+                    };
+                }
+                let is_req_allowed = self.container.exec_authentication_ac_check(authentication_ac_check_req_args);     
+                
+                if !is_req_allowed {
+                    info!("req exec is rejected, terminal mode {:?}", exec_process.terminal());
+                    return Err(Error::NotSupport);
+                }   
+            }
+        }
+
 
         let stdio = exec_process.common.stdio.CreateIO()?;
         exec_process.common.containerIO = stdio;

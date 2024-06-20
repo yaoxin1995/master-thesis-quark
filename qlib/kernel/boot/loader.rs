@@ -49,7 +49,12 @@ use crate::GUEST_KERNEL;
 #[cfg(feature = "cc")]
 use crate::qlib::kernel::Kernel::is_cc_enabled;
 #[cfg(feature = "cc")]
-use crate::shield::{APPLICATION_INFO_KEEPER};
+use crate::shield::APPLICATION_INFO_KEEPER;
+#[cfg(feature = "cc")]
+use crate::qlib::shield_policy::*;
+
+#[cfg(feature = "cc")]
+use crate::shield::exec_shield::EXEC_AUTH_AC;
 
 impl Process {
     pub fn TaskCaps(&self) -> TaskCaps {
@@ -209,8 +214,122 @@ impl Loader {
 
         let mut ttyFileOps = None;
         if procArgs.Terminal {
+            #[cfg(feature = "cc")]
+            let file = task.NewFileFromHostStdioFd(0, procArgs.Stdiofds[0], true, TrackInodeType::TTY(TtyArgs::default()))
+                    .expect("Task: create std fds");
+            
+            #[cfg(not(feature = "cc"))]
             let file = task
-                .NewFileFromHostStdioFd(0, procArgs.Stdiofds[0], true)
+                    .NewFileFromHostStdioFd(0, procArgs.Stdiofds[0], true)
+                    .expect("Task: create std fds");
+
+            file.flags.lock().0.NonBlocking = false; //need to clean the stdio nonblocking
+
+            assert!(task.Dup2(0, 1) == 1);
+            assert!(task.Dup2(0, 2) == 2);
+
+            let fileops = file.FileOp.clone();
+            let ttyops = fileops
+                .as_any()
+                .downcast_ref::<TTYFileOps>()
+                .expect("TTYFileOps convert fail")
+                .clone();
+
+            ttyops.InitForegroundProcessGroup(&tg.ProcessGroup().unwrap());
+            ttyFileOps = Some(ttyops);
+        } else {
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "cc")] {
+                    task.NewStdFds(&procArgs.Stdiofds[..], false, StdioArgs::default())
+                        .expect("Task: create std fds");
+                } else {
+                    task.NewStdFds(&procArgs.Stdiofds[..], false)
+                    .expect("Task: create std fds");
+                }
+            }
+        }
+    
+
+        let execProc = ExecProcess {
+            tg: tg,
+            tty: ttyFileOps,
+            ..Default::default()
+        };
+        self.Lock(task)?
+            .processes
+            .insert(ExecID { cid: cid, pid: tid }, execProc);
+        let paths = GetPath(&procArgs.Envv);
+        procArgs.Filename = task.mountNS.ResolveExecutablePath(
+            task,
+            &procArgs.WorkingDirectory,
+            &procArgs.Filename,
+            &paths,
+        )?;
+        let (entry, userStackAddr, kernelStackAddr) =
+            kernel.LoadProcess(&procArgs.Filename, &mut procArgs.Envv, &mut procArgs.Argv, false)?;
+        return Ok((tid, entry, userStackAddr, kernelStackAddr));
+    }
+
+
+     //Exec a new process in current sandbox, it supports 'runc exec'
+     #[cfg(feature = "cc")]
+     pub fn ExecProcess_CC(&self, process: Process, _resp_fd: i32) -> Result<(i32, u64, u64, u64)> {
+        info!("ExecProcess {:?}", process);
+
+        let exec_id = match process.ExecId.clone() {
+            Some(id) => id,
+            None => {
+                return Err(Error::Common(format!("ExecProcess the exec id doesn't exist")));
+            }
+        };
+        
+        let exec_args;
+        {
+            let mut exec_auth_ac = EXEC_AUTH_AC.write();
+            exec_args = match exec_auth_ac.authenticated_reqs.remove(&exec_id) {
+                Some(authenticated_req) => authenticated_req,
+                None => {
+                    return Err(Error::Common(format!("the req is not valid req")));
+                }
+            };
+        }
+
+        let mut process = process.clone();
+        process.Args = exec_args.args.clone();
+        
+        let task = Task::Current();
+        let kernel = self.Lock(task)?.kernel.clone();
+        let userns = kernel.RootUserNamespace();
+        let mut gids = Vec::with_capacity(process.AdditionalGids.len());
+        for gid in &process.AdditionalGids {
+            gids.push(KGID(*gid))
+        }
+        let cid = process.ID.clone();
+        let creds = auth::Credentials::NewUserCredentials(
+            KUID(process.UID),
+            KGID(process.GID),
+            &gids[..],
+            Some(&process.TaskCaps()),
+            &userns,
+        );
+
+        let mut procArgs = NewProcess(process, &creds, &kernel);
+        procArgs.Argv = exec_args.args.clone();
+
+        let (tg, tid) = kernel.CreateProcess(&mut procArgs)?;
+
+        let mut ttyFileOps = None;
+        if procArgs.Terminal {
+
+            let tty_args = TtyArgs {
+                exec_id : Some(exec_id.clone()),
+                exec_user_type: Some(exec_args.user_type.clone()),
+                tty_slave: procArgs.Stdiofds[0],
+                stdio_type: StdioType::ExecProcessStdio,
+            };
+
+            let file = task
+                .NewFileFromHostStdioFd(0, procArgs.Stdiofds[0], true, TrackInodeType::TTY(tty_args))
                 .expect("Task: create std fds");
             file.flags.lock().0.NonBlocking = false; //need to clean the stdio nonblocking
 
@@ -227,7 +346,42 @@ impl Loader {
             ttyops.InitForegroundProcessGroup(&tg.ProcessGroup().unwrap());
             ttyFileOps = Some(ttyops);
         } else {
-            task.NewStdFds(&procArgs.Stdiofds[..], false)
+            info!("exec start req  {:?}", exec_args);
+            let stdioArgs = match exec_args.exec_type {
+                ExecRequestType::SessionAllocationReq(ref s) => {
+                    StdioArgs {
+                        exec_id: Some(exec_id.clone()),
+                        exec_user_type: Some(exec_args.user_type.clone()),
+                        stdio_type: StdioType::SessionAllocationStdio(s.clone())
+                    }
+                },
+                ExecRequestType::PolicyUpdate(ref arg) => {
+
+                    let exeit = EXEC_AUTH_AC.read().auth_session.contains_key(&arg.session_id);
+
+                    info!("exec start req, auth_session.contains_key(&arg.session_id); {:?}", exeit);
+
+                    let p = PolicyUpdateResult {
+                        result: arg.is_updated,
+                        session_id: arg.session_id
+                    };
+
+                    StdioArgs {
+                        exec_id: Some(exec_id.clone()),
+                        exec_user_type: Some(exec_args.user_type.clone()),
+                        stdio_type: StdioType::PolicyUpdate(p)
+                    }
+                },
+                _ => {
+                    StdioArgs {
+                        exec_id: Some(exec_id.clone()),
+                        exec_user_type: Some(exec_args.user_type.clone()),
+                        stdio_type: StdioType::ExecProcessStdio
+                    }
+                }
+            };
+
+            task.NewStdFds(&procArgs.Stdiofds[..], false, stdioArgs)
                 .expect("Task: create std fds");
         }
 
@@ -269,9 +423,24 @@ impl Loader {
 
         let mut ttyFileOps = None;
         if procArgs.Terminal {
+            #[cfg(not(feature = "cc"))]
             let file = task
                 .NewFileFromHostStdioFd(0, procArgs.Stdiofds[0], true)
                 .expect("Task: create std fds");
+
+            #[cfg(feature = "cc")]
+            let tty_args = TtyArgs {
+                    exec_id : None,
+                    exec_user_type: None,
+                    tty_slave: procArgs.Stdiofds[0],
+                    stdio_type: StdioType::SandboxStdio,
+            };
+    
+            #[cfg(feature = "cc")]
+                let file = task
+                    .NewFileFromHostStdioFd(0, procArgs.Stdiofds[0], true, TrackInodeType::TTY(tty_args))
+                    .expect("Task: create std fds");
+
             file.flags.lock().0.NonBlocking = false; //need to clean the stdio nonblocking
             assert!(task.Dup2(0, 1) == 1);
             assert!(task.Dup2(0, 2) == 2);
@@ -286,8 +455,21 @@ impl Loader {
             ttyops.InitForegroundProcessGroup(&tg.ProcessGroup().unwrap());
             ttyFileOps = Some(ttyops);
         } else {
+            #[cfg(feature = "cc")]
+            let stdioArgs = StdioArgs {
+                exec_id: None,
+                exec_user_type: None,
+                stdio_type: StdioType::SandboxStdio
+            };
+
+            #[cfg(feature = "cc")]
+            task.NewStdFds(&procArgs.Stdiofds[..], false, stdioArgs)
+                .expect("Task: create std fds");
+
+            #[cfg(not(feature = "cc"))]
             task.NewStdFds(&procArgs.Stdiofds[..], false)
                 .expect("Task: create std fds");
+
         }
 
         GetKernel().Start()?;
@@ -398,9 +580,26 @@ impl Loader {
                     "missing terminal fd for subcontainer".to_string(),
                 ));
             }
+
+            #[cfg(feature = "cc")]
+            let tty_args = TtyArgs {
+                exec_id : None,
+                exec_user_type: None,
+                tty_slave: process.hostTTY,
+                stdio_type: StdioType::ContaienrStdio,
+            };
+
+
+            #[cfg(feature = "cc")]
             let file = task
-                .NewFileFromHostStdioFd(0, process.hostTTY, true)
+                .NewFileFromHostStdioFd(0, process.hostTTY, true, TrackInodeType::TTY(tty_args))
                 .expect("Task: create std fds");
+
+            #[cfg(not(feature = "cc"))]
+            let file = task
+                    .NewFileFromHostStdioFd(0, process.hostTTY, true)
+                    .expect("Task: create std fds");
+
             file.flags.lock().0.NonBlocking = false;
 
             assert!(task.Dup2(0, 1) == 1);
@@ -409,12 +608,6 @@ impl Loader {
             let fileops = file.FileOp.clone();
 
             let ttyops = fileops.TTYFileOps().unwrap();
-
-            /*let ttyops = fileops
-            .as_any()
-            .downcast_ref::<TTYFileOps>()
-            .expect("TTYFileOps convert fail")
-            .clone();*/
 
             ttyops.InitForegroundProcessGroup(&tg.ProcessGroup().unwrap());
             ttyFileOps = Some(ttyops)
@@ -429,6 +622,18 @@ impl Loader {
                 "using stdios to start subcontainer: {:?}",
                 &process.stdios[..]
             );
+
+            #[cfg(feature = "cc")]
+            let tty_args = StdioArgs {
+                exec_id : None,
+                exec_user_type: None,
+                stdio_type: StdioType::ContaienrStdio,
+            };
+            #[cfg(feature = "cc")]
+            task.NewStdFds(&process.stdios[..], false, tty_args)
+                .expect("Task: create std fds");
+
+            #[cfg(not(feature = "cc"))]
             task.NewStdFds(&process.stdios[..], false)
                 .expect("Task: create std fds");
         }

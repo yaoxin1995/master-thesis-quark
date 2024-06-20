@@ -157,6 +157,13 @@ pub fn StartSubContainerHandler(args: &mut StartArgs) -> Result<ControlMsg> {
     return Ok(msg);
 }
 
+#[cfg(feature = "cc")]
+pub fn ExecAthenAcCheckHandler (args: &mut ExecAuthenAcCheckArgs) -> Result<ControlMsg> {
+    let msg = ControlMsg::New(Payload::ExecAthenAcCheck(args.clone()));
+    return Ok(msg);
+}
+
+
 pub fn ProcessReqHandler(req: &mut UCallReq, fds: &[i32]) -> Result<ControlMsg> {
     let msg = match req {
         UCallReq::RootContainerStart(start) => RootContainerStartHandler(start)?,
@@ -170,6 +177,8 @@ pub fn ProcessReqHandler(req: &mut UCallReq, fds: &[i32]) -> Result<ControlMsg> 
         UCallReq::ContainerDestroy(cid) => ContainerDestroyHandler(cid)?,
         UCallReq::CreateSubContainer(args) => CreateSubContainerHandler(args, fds)?,
         UCallReq::StartSubContainer(args) => StartSubContainerHandler(args)?,
+        #[cfg(feature = "cc")]
+        UCallReq::ExecAthenAcCheck(args) => ExecAthenAcCheckHandler(args)?,
         UCallReq::WaitAll => WaitAll()?,
     };
 

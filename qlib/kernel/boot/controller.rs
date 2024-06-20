@@ -42,7 +42,8 @@ use super::super::LOADER;
 use super::super::SHARESPACE;
 use super::process::*;
 use crate::qlib::linux::signal::*;
-//use crate::qlib::kernel::vcpu::CPU_LOCAL;
+#[cfg(feature = "cc")]
+use crate::shield::exec_shield::*;
 
 pub fn ControllerProcessHandler() -> Result<()> {
     let task = Task::Current();
@@ -336,6 +337,14 @@ pub fn ControlMsgHandler(fd: *const u8) {
         }
         Payload::WaitAll => {
             SetWaitContainerfd(fd);
+        }
+
+        #[cfg(feature = "cc")]
+        Payload::ExecAthenAcCheck(AuthAcCheckArgs) => {
+            info!("ExecAthenAcCheck {:?}", AuthAcCheckArgs);
+            let is_allowed = exec_req_authentication(AuthAcCheckArgs);
+                        
+            WriteControlMsgResp(fd, &&UCallResp::ExecAthenAcCheckResp(is_allowed), true);
         }
     }
 

@@ -378,6 +378,22 @@ pub fn Load(
 
                 shield_policy.syscall_interceptor_config.enable = true;
                 shield_policy.syscall_interceptor_config.syscalls = [18446744073709551615,18446744073709551615,18446744073709551615,18446744073709551615,18446744073709551615,7935,18446742974197923840,15];
+            
+            
+            
+                shield_policy.privileged_user_config.enable_terminal = true;
+                shield_policy.privileged_user_config.enable_single_shot_command_line_mode = true;
+                shield_policy.privileged_user_config.exec_result_encryption = true;
+                shield_policy.privileged_user_config.enable_container_logs_encryption = true;
+                shield_policy.privileged_user_config.enable_container_logs_encryption = true;
+                shield_policy.privileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string(), "cat".to_string()];
+                shield_policy.privileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/var".to_string()];
+
+
+                shield_policy.unprivileged_user_config.enable_single_shot_command_line_mode = true;
+                shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string()];
+                shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/var/log".to_string()];
+            
             }
 
             info!("before policy_provisioning");

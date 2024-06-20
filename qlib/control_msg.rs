@@ -21,6 +21,9 @@ use super::auth::id::*;
 use super::loader::*;
 use super::singleton::*;
 
+#[cfg(feature = "cc")]
+use crate::qlib::shield_policy::ExecRequestType;
+
 type Cid = String;
 
 pub static MSG_ID: Singleton<AtomicU64> = Singleton::<AtomicU64>::New();
@@ -103,6 +106,17 @@ pub struct StartArgs {
     pub process: Process,
 }
 
+#[cfg(feature = "cc")]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct ExecAuthenAcCheckArgs {
+    pub exec_id: String,
+    pub args: Vec<String>,
+    pub env: Vec<String>,
+    pub cwd: String,
+    pub req_type: ExecRequestType,
+}
+
+
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Payload {
     RootContainerStart(RootProcessStart),
@@ -116,6 +130,8 @@ pub enum Payload {
     ContainerDestroy(Cid),
     CreateSubContainer(CreateArgs),
     StartSubContainer(StartArgs),
+    #[cfg(feature = "cc")]
+    ExecAthenAcCheck(ExecAuthenAcCheckArgs),
     WaitAll,
 }
 
@@ -150,6 +166,7 @@ pub enum UCallResp {
     CreateSubContainerResp,
     StartSubContainerResp,
     WaitAllResp(WaitAllResp),
+    ExecAthenAcCheckResp(bool),
 }
 
 #[derive(Serialize, Deserialize, Debug)]

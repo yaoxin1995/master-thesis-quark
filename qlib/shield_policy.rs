@@ -1,4 +1,4 @@
-use alloc::string::{String};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
@@ -18,8 +18,8 @@ pub enum UserType {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
 pub struct ExecSession {
-    session_id: u32,
-    counter: u32,
+    pub session_id: u32,
+    pub counter: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
