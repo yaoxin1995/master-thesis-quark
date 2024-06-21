@@ -32,6 +32,11 @@ use super::super::fs::file::*;
 use super::super::memmgr::*;
 use super::super::task::*;
 use super::super::util::cstring::*;
+#[cfg(feature = "cc")]
+use crate::qlib::kernel::Kernel::is_cc_enabled;
+#[cfg(feature = "cc")]
+use crate::shield::software_measurement_manager;
+
 
 pub const ELF_MAGIC: &str = "\x7fELF";
 pub const INTERPRETER_SCRIPT_MAGIC: &str = "#!";
@@ -290,6 +295,7 @@ pub fn LoadParseElf(
     file: &File,
     info: &mut ElfHeadersInfo,
     sharedLoadOffset: u64,
+    _filename: &str
 ) -> Result<LoadedElf> {
     let mut first = true;
     let mut start = 0;
@@ -411,6 +417,20 @@ pub fn LoadParseElf(
                 }
                 Ok(()) => (),
             }
+
+            
+            #[cfg(feature = "cc")]
+            if is_cc_enabled() {
+                let mut measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+                while !measurement_manager.is_some() {
+                    measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+                }
+    
+                let mut measurement_manager = measurement_manager.unwrap();
+                measurement_manager.measure_elf_loadable_segment(header.virtual_addr, header.file_size, offset, task, _filename).unwrap();
+            }   
+
+
         }
     }
 
@@ -440,7 +460,7 @@ pub fn LoadParseElf(
 }
 
 // loadInitialELF loads f into mm.
-pub fn LoadInitalElf(task: &mut Task, file: &File) -> Result<LoadedElf> {
+pub fn LoadInitalElf(task: &mut Task, file: &File, _filename: &str) -> Result<LoadedElf> {
     let mut info = ParseHeader(task, file)?;
 
     let l = task
@@ -450,7 +470,7 @@ pub fn LoadInitalElf(task: &mut Task, file: &File) -> Result<LoadedElf> {
 
     let loadAddr = Context64::PIELoadAddress(&l)?;
 
-    let le = LoadParseElf(task, file, &mut info, loadAddr)?;
+    let le = LoadParseElf(task, file, &mut info, loadAddr, _filename)?;
     return Ok(le);
 }
 
@@ -462,7 +482,7 @@ pub fn LoadInitalElf(task: &mut Task, file: &File) -> Result<LoadedElf> {
 //
 // Preconditions:
 //  * f is an ELF file
-pub fn loadInterpreterELF(task: &mut Task, file: &File, initial: &LoadedElf) -> Result<LoadedElf> {
+pub fn loadInterpreterELF(task: &mut Task, file: &File, initial: &LoadedElf, _filename: &str) -> Result<LoadedElf> {
     let mut info = match ParseHeader(task, file) {
         Err(e) => {
             if e == Error::SysError(SysErr::ENOEXEC) {
@@ -492,11 +512,11 @@ pub fn loadInterpreterELF(task: &mut Task, file: &File, initial: &LoadedElf) -> 
 
     // The interpreter is not given a load offset, as its location does not
     // affect brk.
-    return LoadParseElf(task, file, &mut info, 0);
+    return LoadParseElf(task, file, &mut info, 0, _filename);
 }
 
-pub fn LoadElf(task: &mut Task, file: &File) -> Result<LoadedElf> {
-    let mut bin = match LoadInitalElf(task, file) {
+pub fn LoadElf(task: &mut Task, file: &File, _filename: &str) -> Result<LoadedElf> {
+    let mut bin = match LoadInitalElf(task, file, _filename) {
         Err(e) => {
             info!("Error loading binary: {:?}", e);
             return Err(e);
@@ -516,7 +536,7 @@ pub fn LoadElf(task: &mut Task, file: &File) -> Result<LoadedElf> {
         }
 
         let interpFile = task.GetFile(fd as i32)?;
-        interp = loadInterpreterELF(task, &interpFile, &bin)?;
+        interp = loadInterpreterELF(task, &interpFile, &bin,_filename)?;
 
         if interp.interpreter.as_str() != "" {
             info!(

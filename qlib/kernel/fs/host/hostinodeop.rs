@@ -56,7 +56,7 @@ use super::*;
 use crate::qlib::kernel::Kernel::is_cc_enabled;
 
 #[cfg(feature = "cc")]
-use crate::shield::{exec_shield::*, inode_tracker::*};
+use crate::shield::exec_shield::*;
 
 
 pub struct MappableInternal {

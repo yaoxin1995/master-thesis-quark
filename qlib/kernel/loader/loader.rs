@@ -34,12 +34,14 @@ use super::super::task::*;
 use super::elf::*;
 //use super::super::memmgr::mm::*;
 use super::interpreter::*;
-
+#[cfg(feature = "cc")]
+use crate::qlib::kernel::Kernel::is_cc_enabled;
 #[cfg(feature = "cc")]
 use crate::qlib::shield_policy::*;
 #[cfg(feature = "cc")]
 use crate::shield::{//secret_injection::SECRET_KEEPER, 
-    //software_measurement_manager, https_attestation_provisioning_cli, 
+    software_measurement_manager, 
+    //https_attestation_provisioning_cli, 
     policy_provisioning,
     APPLICATION_INFO_KEEPER, 
     guest_syscall_interceptor
@@ -205,7 +207,34 @@ pub fn LoadExecutable(
         }
 
         if SliceCompare(&hdr, ELF_MAGIC.as_bytes()) {
-            let loaded = LoadElf(task, &file)?;
+
+            info!("start to load LoadElf name {:?}", filename);
+            #[cfg(feature = "cc")]
+            if is_cc_enabled() {
+                let mut measurement_manager = crate::shield::software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+                while !measurement_manager.is_some() {
+                    measurement_manager = crate::shield::software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+                }
+
+                let mut measurement_manager = measurement_manager.unwrap();
+
+                measurement_manager.init_binary_hash(&filename).unwrap();
+            }
+
+            let loaded = LoadElf(task, &file, &filename)?;
+
+            #[cfg(feature = "cc")]
+            if is_cc_enabled() {
+                let mut measurement_manager = crate::shield::software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+                while !measurement_manager.is_some() {
+                    measurement_manager = crate::shield::software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+                }
+
+                let mut measurement_manager = measurement_manager.unwrap();
+
+                measurement_manager.check_binary_hash(&filename).unwrap();
+            }
+
             return Ok((loaded, executable, argv));
         } else if SliceCompare(&hdr[..2], INTERPRETER_SCRIPT_MAGIC.as_bytes()) {
             info!("start to load script {}", filename);
@@ -280,11 +309,10 @@ pub fn CreateStack(task: &Task) -> Result<Range> {
 
 pub const TASK_COMM_LEN: usize = 16;
 
-
+#[cfg(feature = "cc")]
 // Load loads file with filename into memory.
 //return (entry: u64, usersp: u64, kernelsp: u64)
-#[cfg(feature = "cc")]
-pub fn Load(
+pub fn LoadCC(
     task: &mut Task,
     filename: &str,
     argv: &mut Vec<String>,
@@ -326,23 +354,22 @@ pub fn Load(
 
     let mut stack = Stack::New(stackRange.End());
 
-    // TODO: enable when software manager is added
-    // let software_measurement;
+    let software_measurement;
     {   
 
-        // let mut measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
-        // while !measurement_manager.is_some() {
-        //     measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
-        // }
+        let mut measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+        while !measurement_manager.is_some() {
+            measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+        }
 
-        // let mut measurement_manager = measurement_manager.unwrap();
+        let mut measurement_manager = measurement_manager.unwrap();
 
-        // let res = measurement_manager.check_before_app_starts( app_name.eq(name), filename);
-        // if res.is_err() {
-        //     info!("Loadmeasurement_manager.measure_stack got error {:?}", res);
-        //     return Err(res.err().unwrap());
-        // }
-        // software_measurement = measurement_manager.get_measurement().unwrap();
+        let res = measurement_manager.check_before_app_starts( app_name.eq(name), filename);
+        if res.is_err() {
+            info!("Loadmeasurement_manager.measure_stack got error {:?}", res);
+            return Err(res.err().unwrap());
+        }
+        software_measurement = measurement_manager.get_measurement().unwrap();
     }
 
 
@@ -393,6 +420,8 @@ pub fn Load(
                 shield_policy.unprivileged_user_config.enable_single_shot_command_line_mode = true;
                 shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string()];
                 shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/var/log".to_string()];
+
+                
             
             }
 
@@ -469,8 +498,7 @@ pub fn Load(
 
 // Load loads file with filename into memory.
 //return (entry: u64, usersp: u64, kernelsp: u64)
-#[cfg(not(feature = "cc"))]
-pub fn Load(
+pub fn LoadNormal(
     task: &mut Task,
     filename: &str,
     argv: &mut Vec<String>,
@@ -504,10 +532,12 @@ pub fn Load(
         task, &mut stack, &loaded, filename, &argv, envv, extraAuxv, vdsoAddr,
     )?;
 
+    #[cfg(not(feature = "cc"))]
     let kernelsp = Task::TaskId().Addr() + MemoryDef::DEFAULT_STACK_SIZE - 0x10;
+    #[cfg(feature = "cc")]
+    let kernelsp = Task::PrivateTaskID() + MemoryDef::DEFAULT_STACK_SIZE - 0x10;
+
     let entry = loaded.entry;
-
-
     return Ok((entry, usersp, kernelsp));
 }
 

@@ -479,9 +479,18 @@ impl Kernel {
         assert!(threads.len() == 1, "ThreadGroup start has multiple threads");*/
 
         let task = Task::Current();
-        return Load(task, fileName, args, envs, &Vec::new(), isSubContainer);
 
-        //return Thread::Start(fileName, envs, args);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "cc")] {
+                if is_cc_enabled() {
+                    return LoadCC(task, fileName, args, envs, &Vec::new(), isSubContainer);
+                } else {
+                    return LoadNormal(task, fileName, args, envs, &Vec::new(), isSubContainer);
+                } 
+            } else  {
+                return LoadNormal(task, fileName, args, envs, &Vec::new(), isSubContainer);
+            }
+        }
     }
 
     // Pause requests that all tasks in k temporarily stop executing, and blocks

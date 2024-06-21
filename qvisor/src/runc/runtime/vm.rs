@@ -24,7 +24,7 @@ use lazy_static::lazy_static;
 use nix::sys::signal;
 
 #[cfg (feature = "cc")]
-use crate::qlib::kernel::Kernel::{ENABLE_CC, IDENTICAL_MAPPING};
+use crate::qlib::kernel::Kernel::IDENTICAL_MAPPING;
 use crate::qlib::MAX_VCPU_COUNT;
 use crate::tsot_agent::TSOT_AGENT;
 //use crate::vmspace::hibernate::HiberMgr;

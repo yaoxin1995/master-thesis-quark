@@ -3,6 +3,7 @@ pub mod guest_syscall_interceptor;
 mod cryptographic_utilities;
 pub mod exec_shield;
 pub mod inode_tracker;
+pub mod software_measurement_manager;
 
 use crate::aes_gcm::{ Aes256Gcm, Key};
 use alloc::{vec::Vec, string::String};
@@ -14,8 +15,9 @@ use qlib::shield_policy::KbsPolicy;
 use crate::shield::guest_syscall_interceptor::syscall_interceptor_policy_update;
 use crate::shield::exec_shield::{EXEC_AUTH_AC, STDOUT_EXEC_RESULT_SHIELD, ExecAthentityAcChekcer};
 use spin::rwlock::RwLockWriteGuard;
-use self::exec_shield::*;
 use self::inode_tracker::*;
+use sha2::{Sha512, Digest};
+use base64ct::{Base64, Encoding};
 
 lazy_static! {
     pub static ref APPLICATION_INFO_KEEPER:  RwLock<ApplicationInfoKeeper> = RwLock::new(ApplicationInfoKeeper::default());
@@ -231,19 +233,17 @@ pub fn policy_provisioning (policy: &KbsPolicy) -> Result<()> {
 
     }
 
+    {
+        let mut measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+        while !measurement_manager.is_some() {
+            measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+        }
 
-    // TODO
-    // {
-    //     let mut measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
-    //     while !measurement_manager.is_some() {
-    //         measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
-    //     }
-
-    //     let mut measurement_manager = measurement_manager.unwrap();
+        let mut measurement_manager = measurement_manager.unwrap();
 
 
-    //     measurement_manager.init(&policy.enclave_mode, &policy.runtime_reference_measurements).unwrap();
-    // }
+        measurement_manager.init(&policy.enclave_mode, &policy.runtime_reference_measurements).unwrap();
+    }
 
 
     qkernel_log_magager::qlog_magager_update(&policy.qkernel_log_config).unwrap();
@@ -295,3 +295,20 @@ pub fn policy_update (new_policy: &KbsPolicy,  exec_ac: &mut RwLockWriteGuard<Ex
 
     Ok(())
 }
+
+
+// Returns a base64 of the sha512 of all chunks.
+pub fn hash_chunks(chunks: Vec<Vec<u8>>) -> String {
+	let mut hasher = Sha512::new();
+
+	for chunk in chunks.iter() {
+		hasher.update(chunk);
+	}
+
+	let res = hasher.finalize();
+
+	let base64 = Base64::encode_string(&res);
+
+	base64
+} 
+

@@ -39,6 +39,8 @@ use super::super::SignalDef::*;
 use super::super::SHARESPACE;
 use super::sys_rusage::*;
 use arch::__arch::arch_def::ArchFPState;
+#[cfg(feature = "cc")]
+use is_cc_enabled;
 
 #[derive(Default, Debug)]
 pub struct ElfInfo {
@@ -349,7 +351,19 @@ pub fn Execvat(
         }
 
         let extraAxv = Vec::new();
-        Load(task, &fileName, &mut argv, &mut envv, &extraAxv, false)?
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "cc")] {
+                if is_cc_enabled() {
+                    LoadCC(task, &fileName, &mut argv, &mut envv, &extraAxv, false)?
+                } else {
+                    LoadNormal(task, &fileName, &mut argv, &mut envv, &extraAxv, false)?
+                } 
+            } else  {
+                LoadNormal(task, &fileName, &mut argv, &mut envv, &extraAxv, false)?
+            }
+        }
+
+        
     };
 
     //need to clean object on stack before enter_user as the stack will be destroyed

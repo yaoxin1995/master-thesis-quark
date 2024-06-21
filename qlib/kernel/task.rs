@@ -65,8 +65,6 @@ use crate::{GLOBAL_ALLOCATOR, IS_GUEST};
 #[cfg(feature = "cc")]
 use Kernel::is_cc_enabled;
 #[cfg(feature = "cc")]
-use crate::qlib::control_msg::StartArgs;
-#[cfg(feature = "cc")]
 use crate::qlib::shield_policy::*;
 
 
