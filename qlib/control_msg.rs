@@ -117,6 +117,19 @@ pub struct ExecAuthenAcCheckArgs {
 }
 
 
+#[cfg(feature = "cc")]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct TermianlIoArgs {
+    // the container ID that the exec process belongs to
+    pub cid: String,
+    // exec process id
+    pub pid: i32,
+    // fd to be sent to the new container, first: fifo_fd, seconde: tty_master
+    pub fds: Vec<i32>,
+}
+
+
+
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Payload {
     RootContainerStart(RootProcessStart),
@@ -130,9 +143,11 @@ pub enum Payload {
     ContainerDestroy(Cid),
     CreateSubContainer(CreateArgs),
     StartSubContainer(StartArgs),
+    WaitAll,
     #[cfg(feature = "cc")]
     ExecAthenAcCheck(ExecAuthenAcCheckArgs),
-    WaitAll,
+    #[cfg(feature = "cc")]
+    ProcessIncommingTerminalIoFrame(TermianlIoArgs),
 }
 
 impl Default for Payload {
@@ -166,7 +181,10 @@ pub enum UCallResp {
     CreateSubContainerResp,
     StartSubContainerResp,
     WaitAllResp(WaitAllResp),
+    #[cfg(feature = "cc")]
     ExecAthenAcCheckResp(bool),
+    #[cfg(feature = "cc")]
+    ProcessIncommingTerminalIoFrameResp(i64),
 }
 
 #[derive(Serialize, Deserialize, Debug)]

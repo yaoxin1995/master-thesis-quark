@@ -40,6 +40,8 @@ pub enum UCallReq {
     StartSubContainer(StartArgs),
     #[cfg(feature = "cc")]
     ExecAthenAcCheck(ExecAuthenAcCheckArgs),
+    #[cfg(feature = "cc")]
+    ProcessIncommingTerminalIoFrame(TermianlIoArgs),
     WaitAll,
 }
 
@@ -55,6 +57,8 @@ impl FileDescriptors for UCallReq {
                     return Some(&args.fds);
                 }
             }
+            #[cfg(feature = "cc")]
+            UCallReq::ProcessIncommingTerminalIoFrame(args) => return Some(&args.fds),
             _ => return None,
         }
     }

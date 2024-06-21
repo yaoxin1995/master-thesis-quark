@@ -163,6 +163,24 @@ pub fn ExecAthenAcCheckHandler (args: &mut ExecAuthenAcCheckArgs) -> Result<Cont
     return Ok(msg);
 }
 
+#[cfg(feature = "cc")]
+pub fn ProcessTerminalStdinIo(args: &mut TermianlIoArgs, fds: &[i32]) -> Result<ControlMsg> {
+    //set fds back to args,
+    assert!(fds.len() == 2);
+    args.fds[0] = fds[0];
+    args.fds[1] = fds[1];
+
+    info!("ProcessTerminalStdinIo cid {}, pid {}", args.cid, args.pid);
+    for i in 0..fds.len() {
+        let osfd = args.fds[i];
+
+        let hostfd = GlobalIOMgr().AddFile(osfd);
+        args.fds[i] = hostfd;
+    }
+
+    let msg = ControlMsg::New(Payload::ProcessIncommingTerminalIoFrame(args.clone()));
+    return Ok(msg);
+}
 
 pub fn ProcessReqHandler(req: &mut UCallReq, fds: &[i32]) -> Result<ControlMsg> {
     let msg = match req {
@@ -179,6 +197,8 @@ pub fn ProcessReqHandler(req: &mut UCallReq, fds: &[i32]) -> Result<ControlMsg> 
         UCallReq::StartSubContainer(args) => StartSubContainerHandler(args)?,
         #[cfg(feature = "cc")]
         UCallReq::ExecAthenAcCheck(args) => ExecAthenAcCheckHandler(args)?,
+        #[cfg(feature = "cc")]
+        UCallReq::ProcessIncommingTerminalIoFrame(args) => ProcessTerminalStdinIo(args, fds)?,
         UCallReq::WaitAll => WaitAll()?,
     };
 
