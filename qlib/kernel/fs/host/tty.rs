@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::qlib::kernel::Kernel::is_cc_enabled;
 use crate::qlib::mutex::*;
 use alloc::sync::Arc;
 use core::any::Any;
@@ -35,7 +36,8 @@ use super::super::file::*;
 use super::super::host::hostinodeop::*;
 use super::super::inode::*;
 use super::hostfileop::*;
-
+#[cfg(feature = "cc")]
+use crate::shield::terminal_shield::{TERMINAL_SHIELD, TermianlIoShiled};
 use super::ioctl::*;
 
 pub const NUM_CONTROL_CHARACTERS: usize = 19;
@@ -588,17 +590,35 @@ impl FileOperations for TTYFileOps {
         if size == 0 {
             return Ok(0);
         }
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "cc")] {
+                let mut new_src = srcs;
+                let iov_unrapt;
+                if is_cc_enabled() {
+                    let check_readlocked = TERMINAL_SHIELD.read();
+        
+                    let inode_id = f.Dirent.inode.ID();
+                    // TODO: check if we need to encrypt the terminal
+                    let (_new_length, iov) = check_readlocked.termianlIoEncryption(srcs, task, inode_id)?;
+            
+                    iov_unrapt = iov.unwrap();
+                    new_src =  &iov_unrapt[..];
+                }
+            } else {
+                let new_src = srcs;
+            }
+        }
 
         if SHARESPACE.config.read().UringIO && ENABLE_RINGBUF {
             let fd = self.lock().fd;
             let queue = self.lock().queue.clone();
             let ringBuf = self.lock().buf.clone();
 
-            return QUring::RingFileWrite(task, fd, queue, ringBuf, srcs, Arc::new(self.clone()));
+            return QUring::RingFileWrite(task, fd, queue, ringBuf, new_src, Arc::new(self.clone()));
         }
 
         let fops = self.lock().fileOps.clone();
-        let res = fops.WriteAt(task, f, srcs, offset, blocking);
+        let res = fops.WriteAt(task, f, new_src, offset, blocking);
         return res;
     }
 

@@ -2,6 +2,7 @@ pub mod guest_syscall_interceptor;
 pub mod exec_shield;
 pub mod inode_tracker;
 pub mod software_measurement_manager;
+pub mod terminal_shield;
 
 use spin::rwlock::RwLock;
 use crate::qlib::common::*;

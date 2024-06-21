@@ -422,7 +422,6 @@ pub fn LoadCC(
                 shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/var/log".to_string()];
 
                 
-            
             }
 
             info!("before policy_provisioning");

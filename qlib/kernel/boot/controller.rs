@@ -43,7 +43,7 @@ use super::super::SHARESPACE;
 use super::process::*;
 use crate::qlib::linux::signal::*;
 #[cfg(feature = "cc")]
-use crate::shield::exec_shield::*;
+use crate::shield::{terminal_shield::*, exec_shield::*};
 
 pub fn ControllerProcessHandler() -> Result<()> {
     let task = Task::Current();
@@ -345,6 +345,17 @@ pub fn ControlMsgHandler(fd: *const u8) {
             let is_allowed = exec_req_authentication(AuthAcCheckArgs);
                         
             WriteControlMsgResp(fd, &&UCallResp::ExecAthenAcCheckResp(is_allowed), true);
+        }
+        #[cfg(feature = "cc")]
+        Payload::ProcessIncommingTerminalIoFrame(args) => {
+            info!("Payload::ProcessIncommingTerminalIoFrame start, pid {}", args.pid);
+
+            let termianl_shield = TERMINAL_SHIELD.read();
+        
+            let res = termianl_shield.console_copy_from_fifo_to_tty(args.fds[0], args.fds[1], &args.cid, args.pid, true, task).unwrap();
+            info!("console_copy_from_fifo_to_tty res {}", res);
+            
+            WriteControlMsgResp(fd, &&UCallResp::ProcessIncommingTerminalIoFrameResp(res), true);
         }
     }
 
