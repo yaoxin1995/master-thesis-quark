@@ -25,6 +25,10 @@ use super::super::qlib::common::*;
 use super::super::qlib::linux_def::*;
 use super::super::syscalls::syscalls::*;
 use super::super::task::*;
+#[cfg(feature = "cc")]
+use crate::shield::software_measurement_manager;
+#[cfg(feature = "cc")]
+use is_cc_enabled;
 
 pub fn SysMmap(task: &mut Task, args: &SyscallArguments) -> Result<i64> {
     let addr = args.arg0 as u64;
@@ -126,10 +130,51 @@ pub fn SysMmap(task: &mut Task, args: &SyscallArguments) -> Result<i64> {
         opts.Mappable = MMappable::FromHostIops(memfdIops);
     }
 
-    match task.mm.MMap(task, &mut opts) {
-        Ok(addr) => Ok(addr as i64),
-        Err(e) => Err(e),
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "cc")] {
+            if is_cc_enabled() {
+                let start_adr = task.mm.MMap(task, &mut opts)?;
+
+                let file = task.GetFile(fd);
+                if file.is_err() {
+                    return Ok(start_adr as i64);
+                }
+                
+                let file = file.unwrap();
+                let file_name = file.MappedName(task);
+                let is_shared_lib =  software_measurement_manager::is_shared_lib(&file_name).unwrap();
+            
+                debug!("SysMmap addr {:x}, len {:x}, prot {:?}, flags {:?}, fd {:?}, offset {:?}, fixed {:?}, private {:?}, shared: {:?}, anon {:?} file_name {:?}, is_shared_lib {:?}", addr, len, prot, flags, fd, offset, fixed, private, shared, anon, file_name, is_shared_lib);
+            
+                if is_shared_lib {
+                    let mut measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+                    while !measurement_manager.is_some() {
+                        measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+                    }
+                    let mut measurement_manager = measurement_manager.unwrap();
+                    let root = task.Root();
+                    let (file_name, _) = file.Dirent.FullName(&root);
+                    let pid = task.Thread().ThreadGroup().ID();
+                    let file_name_key = format!("{} {}", pid, file_name);
+                    measurement_manager.measure_shared_lib_loadable_segment(start_adr, &file, &task, fixed, len, offset, file_name_key).unwrap();
+                }
+            
+                Ok(start_adr as i64)
+            } else {
+                match task.mm.MMap(task, &mut opts) {
+                    Ok(addr) => Ok(addr as i64),
+                    Err(e) => Err(e),
+                }
+            } 
+        } else  {
+            match task.mm.MMap(task, &mut opts) {
+                Ok(addr) => Ok(addr as i64),
+                Err(e) => Err(e),
+            }
+        }
     }
+
+
 }
 
 pub fn SysMprotect(task: &mut Task, args: &SyscallArguments) -> Result<i64> {

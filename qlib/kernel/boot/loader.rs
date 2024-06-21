@@ -49,12 +49,9 @@ use crate::GUEST_KERNEL;
 #[cfg(feature = "cc")]
 use crate::qlib::kernel::Kernel::is_cc_enabled;
 #[cfg(feature = "cc")]
-use crate::shield::APPLICATION_INFO_KEEPER;
+use crate::shield::{APPLICATION_INFO_KEEPER, exec_shield::EXEC_AUTH_AC, software_measurement_manager};
 #[cfg(feature = "cc")]
 use crate::qlib::shield_policy::*;
-
-#[cfg(feature = "cc")]
-use crate::shield::exec_shield::EXEC_AUTH_AC;
 
 impl Process {
     pub fn TaskCaps(&self) -> TaskCaps {
@@ -525,12 +522,30 @@ impl Loader {
 
     pub fn StartSubContainer(&self, processSpec: Process) -> Result<(i32, u64, u64, u64)> {
         #[cfg(feature = "cc")]
-        {
-            if is_cc_enabled(){
+        if is_cc_enabled(){
+            {
+                let mut measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+                while !measurement_manager.is_some() {
+                    measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+                }
+        
+                let mut measurement_manager = measurement_manager.unwrap();
+        
+        
+                measurement_manager.set_application_name(&processSpec.Envs)?;
+        
+                let res = measurement_manager.start_track_app_creation(&processSpec, false);
+                if res.is_err() {
+                    info!("StartSubContainer start_track_app_creation(&processSpec) got error {:?}", res);
+                    return Err(res.err().unwrap());
+                }
+            }
+
+            {
                 let mut application_info_keeper = APPLICATION_INFO_KEEPER.write();
                 application_info_keeper.init(&processSpec.Envs, processSpec.ID.clone()).unwrap();
             }
-        }
+       }
         
         let task = Task::Current();
         let mut lockedLoader = self.Lock(task)?;

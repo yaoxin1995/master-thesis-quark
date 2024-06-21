@@ -140,7 +140,7 @@ use alloc::boxed::Box;
 #[cfg(feature = "cc")]
 use memmgr::pma::PageMgr;
 #[cfg(feature = "cc")]
-use shield::init_shielding_layer;
+use shield::{init_shielding_layer, software_measurement_manager};
 
 #[macro_use]
 mod print;
@@ -803,6 +803,25 @@ pub extern "C" fn rust_main(
 
 
     /***************** can't run any qcall before this point ************************************/
+    #[cfg(feature = "cc")]
+    {   
+        if is_cc_enabled() {
+            let mut measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+            while !measurement_manager.is_some() {
+                measurement_manager = software_measurement_manager::SOFTMEASUREMENTMANAGER.try_write();
+            }
+    
+            let config = crate::SHARESPACE.config.read().clone();
+            let mut measurement_manager = measurement_manager.unwrap();
+            let res = measurement_manager.measure_qkernel_argument(config);
+            if res.is_err() {
+                panic!("measure_qkernel_argument got error {:?}", res);
+            }
+        }
+
+    }
+
+
 
     if id == 0 {
         //error!("start main: {}", ::AllocatorPrint(10));

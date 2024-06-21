@@ -116,7 +116,7 @@ use crate::qlib::linux_def::MemoryDef;
 //use crate::qlib::mem::bitmap_allocator::BitmapAllocatorWrapper;
 #[cfg (feature = "cc")]
 use crate::qlib::kernel::Kernel::ENABLE_CC;
-
+#[cfg(feature = "cc")]
 use core::sync::atomic::Ordering;
 use self::vmspace::uringMgr::*;
 use crate::kvm_vcpu::KVMVcpu;
