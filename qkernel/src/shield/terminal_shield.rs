@@ -166,7 +166,7 @@ impl TermianlIoShiled for TerminalShield {
     fn filter_signal_and_write(&self, task: &Task, to_fd: i32, s: &[u8], cid: &str, pid: i32) -> Result<()> {
         let len = s.len();
         let mut offset = 0;
-        let rawData= s.clone();
+        let rawData= s;
         for i in 0..len {
             if let Some(sig) = self.get_signal(s[i]) {
                 let sigArgs = SignalArgs {

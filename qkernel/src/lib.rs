@@ -64,6 +64,8 @@ extern crate hmac;
 extern crate base64ct;
 #[cfg(feature = "cc")]
 extern crate postcard;
+#[cfg(feature = "cc")]
+extern crate modular_bitfield;
 
 use core::panic::PanicInfo;
 use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
@@ -139,6 +141,7 @@ use alloc::boxed::Box;
 use memmgr::pma::PageMgr;
 #[cfg(feature = "cc")]
 use shield::{init_shielding_layer, software_measurement_manager};
+
 
 #[macro_use]
 mod print;

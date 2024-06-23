@@ -44,8 +44,10 @@ use crate::shield::{//secret_injection::SECRET_KEEPER,
     //https_attestation_provisioning_cli, 
     policy_provisioning,
     APPLICATION_INFO_KEEPER, 
-    guest_syscall_interceptor
+    guest_syscall_interceptor,
+    sev_guest::GUEST_SEV_DEV
     };
+
 
 
 // maxLoaderAttempts is the maximum number of attempts to try to load
@@ -221,7 +223,9 @@ pub fn LoadExecutable(
                 measurement_manager.init_binary_hash(&filename).unwrap();
             }
 
+            info!("start to load LoadElf name 0");
             let loaded = LoadElf(task, &file, &filename)?;
+            info!("start to load LoadElf name 1");
 
             #[cfg(feature = "cc")]
             if is_cc_enabled() {
@@ -421,6 +425,22 @@ pub fn LoadCC(
                 shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string()];
                 shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/var/log".to_string()];
 
+
+                let ehd_chunks = vec![
+                    software_measurement.to_string().into_bytes(),
+                ];
+        
+                let ehd = crate::shield::hash_chunks(ehd_chunks);
+                let tee_evidence;
+                {
+                    let mut attester = GUEST_SEV_DEV.write();
+                    tee_evidence = attester
+                        .get_report(ehd)
+                        .map_err(|e| Error::Common(format!("generate_evidence get report failed: {:?}", e)))?;
+                }
+
+                info!("tee_evidence {:?}", tee_evidence);
+                
                 
             }
 

@@ -60,7 +60,7 @@ io-uring = "0.6.3"
 aes-gcm = "0.10.1"
 getrandom = { version = "0.2", features = ["rdrand"] }
 cfg-if = "0.1"
-
+modular-bitfield = "0.11.2"
 [features]
 cuda = ["cuda-driver-sys", "cuda-runtime-sys", "libelf", "rcublas-sys", "cuda11-cublasLt-sys"]
 cc = []
