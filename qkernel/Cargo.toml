@@ -26,6 +26,7 @@ hmac = "0.12.1"
 base64ct = { version = "1.5.3",  features = ["alloc"]}
 postcard ={ version = "1.0", features = ["alloc"] }
 cfg-if = "0.1"
+modular-bitfield = "0.11.2"
 
 [features]
 cc = []

@@ -5,6 +5,7 @@ pub mod exec_shield;
 pub mod inode_tracker;
 pub mod software_measurement_manager;
 pub mod terminal_shield;
+pub mod sev_guest;
 
 use crate::aes_gcm::{ Aes256Gcm, Key};
 use alloc::{vec::Vec, string::String};
@@ -184,6 +185,8 @@ pub fn init_shielding_layer () ->() {
     let mut stdout_exec_result_shield = STDOUT_EXEC_RESULT_SHIELD.write();
     stdout_exec_result_shield.init(&default_policy, &encryption_key);
 
+    // init sev guest driver
+    sev_guest::GUEST_SEV_DEV.write().init(0);
 
     qkernel_log_magager::qlog_magager_init().unwrap();
 }

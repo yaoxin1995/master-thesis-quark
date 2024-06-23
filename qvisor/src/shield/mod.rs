@@ -3,6 +3,7 @@ pub mod exec_shield;
 pub mod inode_tracker;
 pub mod software_measurement_manager;
 pub mod terminal_shield;
+pub mod sev_guest;
 
 use spin::rwlock::RwLock;
 use crate::qlib::common::*;
@@ -55,3 +56,8 @@ impl ApplicationInfoKeeper {
 pub fn policy_provisioning (_policy: &KbsPolicy) -> Result<()> {
     Err(Error::NotSupport)
 }
+
+// Returns a base64 of the sha512 of all chunks.
+pub fn hash_chunks(_chunks: Vec<Vec<u8>>) -> String {
+    "".to_string()
+} 

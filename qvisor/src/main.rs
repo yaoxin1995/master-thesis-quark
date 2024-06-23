@@ -62,7 +62,10 @@ extern crate tabwriter;
 
 #[cfg(feature = "cc")]
 extern crate aes_gcm;
+#[cfg(feature = "cc")]
+extern crate modular_bitfield;
 extern crate cfg_if;
+
 
 #[macro_use]
 pub mod print;
