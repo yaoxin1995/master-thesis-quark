@@ -416,15 +416,15 @@ pub fn LoadCC(
             //     shield_policy.privileged_user_config.enable_terminal = true;
             //     shield_policy.privileged_user_config.enable_single_shot_command_line_mode = true;
             //     shield_policy.privileged_user_config.exec_result_encryption = true;
-            //     shield_policy.privileged_user_config.enable_container_logs_encryption = true;
+            // shield_policy.privileged_user_config.enable_container_logs_encryption = false;
             //     shield_policy.privileged_user_config.enable_container_logs_encryption = true;
             //     shield_policy.privileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string(), "cat".to_string()];
             //     shield_policy.privileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/var".to_string()];
 
 
-                shield_policy.unprivileged_user_config.enable_single_shot_command_line_mode = true;
-                shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string(), "cat".to_string(), "printenv".to_string()];
-                shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/".to_string()];
+            // shield_policy.unprivileged_user_config.enable_single_shot_command_line_mode = true;
+            // shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string(), "cat".to_string(), "printenv".to_string()];
+            // shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/".to_string()];
 
 
             //     let ehd_chunks = vec![
@@ -451,7 +451,6 @@ pub fn LoadCC(
 
             guest_syscall_interceptor::syscall_interceptor_init(shield_policy.syscall_interceptor_config.clone()).unwrap();
 
-            // TODO: when secret_injector is added
             {
                 let mut secret_injector =  secret_injection::SECRET_KEEPER.write();
     
