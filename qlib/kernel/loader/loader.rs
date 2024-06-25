@@ -37,15 +37,13 @@ use super::interpreter::*;
 #[cfg(feature = "cc")]
 use crate::qlib::kernel::Kernel::is_cc_enabled;
 #[cfg(feature = "cc")]
-use crate::qlib::shield_policy::*;
-#[cfg(feature = "cc")]
 use crate::shield::{//secret_injection::SECRET_KEEPER, 
     software_measurement_manager, 
     https_attestation_provisioning_cli, 
     policy_provisioning,
     APPLICATION_INFO_KEEPER, 
     guest_syscall_interceptor,
-    sev_guest::GUEST_SEV_DEV
+    secret_injection
     };
 
 
@@ -397,9 +395,11 @@ pub fn LoadCC(
             let (shield_policy, secret) = res.unwrap();
             // updata the policy
 
-            info!("provisioning_http_client 11, {:?}", shield_policy);
+            // info!("provisioning_http_client 11, {:?}", shield_policy);
 
-            // let mut shield_policy = KbsPolicy::default();
+            let mut shield_policy = shield_policy.clone();
+
+            info!("provisioning_http_client 11, {:?}", shield_policy);
             
 
             // // TEST
@@ -422,9 +422,9 @@ pub fn LoadCC(
             //     shield_policy.privileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/var".to_string()];
 
 
-            //     shield_policy.unprivileged_user_config.enable_single_shot_command_line_mode = true;
-            //     shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string()];
-            //     shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/var/log".to_string()];
+                shield_policy.unprivileged_user_config.enable_single_shot_command_line_mode = true;
+                shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string(), "cat".to_string(), "printenv".to_string()];
+                shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/".to_string()];
 
 
             //     let ehd_chunks = vec![
@@ -442,22 +442,24 @@ pub fn LoadCC(
 
             //     info!("tee_evidence {:?}", tee_evidence);
             // }
+            info!("provisioning_http_client 11111, {:?}", shield_policy);
 
-            info!("before policy_provisioning policy");
+            info!("provisioning_http_client secret, {:?}", secret);
+            // info!("before policy_provisioning policy");
             policy_provisioning(&shield_policy).unwrap();
             info!("after policy_provisioning");
 
             guest_syscall_interceptor::syscall_interceptor_init(shield_policy.syscall_interceptor_config.clone()).unwrap();
 
             // TODO: when secret_injector is added
-            // {
-            //     let mut secret_injector =  SECRET_KEEPER.write();
+            {
+                let mut secret_injector =  secret_injection::SECRET_KEEPER.write();
     
-            //     let res = secret_injector.bookkeep_secrets(secret.clone());
-            //     if res.is_err() {
-            //         info!("Load: failed to call file_based_secret_injection");
-            //     }
-            // }
+                let res = secret_injector.bookkeep_secrets(secret.clone());
+                if res.is_err() {
+                    info!("Load: failed to call file_based_secret_injection");
+                }
+            }
         }
 
 
@@ -465,32 +467,30 @@ pub fn LoadCC(
         // secret injection
         guest_syscall_interceptor::syscall_interceptor_set_app_pid(task.Thread().ThreadGroup().ID()).unwrap();
 
-        // TODO: when secret_injector is added
         // file based secret injection
-        // let env_arg_secret;
-        // {
-        //     let secret_injector = SECRET_KEEPER.read();
-        //     let res = secret_injector.inject_file_based_secret_to_secret_file_system(task);
-        //     env_arg_secret= secret_injector.arg_env_based_secrets.clone();
+        let env_arg_secret;
+        {
+            let secret_injector = secret_injection::SECRET_KEEPER.read();
+            let res = secret_injector.inject_file_based_secret_to_secret_file_system(task);
+            env_arg_secret= secret_injector.arg_env_based_secrets.clone();
 
-        //     if res.is_err() {
-        //         info!("Load: failed to set up file system for secrets on guest memory");
-        //     }
-        // }
+            if res.is_err() {
+                info!("Load: failed to set up file system for secrets on guest memory");
+            }
+        }
 
-        // TODO: when secret_injector is added
         // env based secret injection
-        // if env_arg_secret.is_some() {
+        if env_arg_secret.is_some() {
 
-        //     let cmd_envs = env_arg_secret.as_ref().unwrap();
-        //     let mut env_secrets = cmd_envs.env_variables.clone();
-        //     envv.append(&mut env_secrets);
+            let cmd_envs = env_arg_secret.as_ref().unwrap();
+            let mut env_secrets = cmd_envs.env_variables.clone();
+            envv.append(&mut env_secrets);
     
-        //     // app args based secret injection
-        //     let mut arg_secrets = cmd_envs.cmd_arg.clone();
-        //     argv.append(&mut arg_secrets);
+            // app args based secret injection
+            let mut arg_secrets = cmd_envs.cmd_arg.clone();
+            argv.append(&mut arg_secrets);
 
-        // }
+        }
 
         {
             let mut  app_info_keeper = APPLICATION_INFO_KEEPER.write();

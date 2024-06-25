@@ -37,6 +37,9 @@ use crate::qlib::kernel::fs::procfs::task::comm::CommReadonlyFileNode;
 use crate::qlib::kernel::fs::procfs::task::exec_args::ExecArgReadonlyFileNode;
 use crate::qlib::kernel::fs::procfs::task::uid_pid_map::IdMapReadonlyFileNode;
 use crate::qlib::kernel::fs::procfs::uptime::UptimeFileNode;
+#[cfg(feature = "cc")]
+use crate::qlib::kernel::fs::secretfs::secretinfo::SecretInfoFileNode;
+
 
 pub fn NewSnapshotReadonlyFileOperations(data: Vec<u8>) -> ReadonlyFileOperations {
     let node = SnapshotReadonlyFileNode {
@@ -87,6 +90,8 @@ pub enum ReadonlyFileNode {
     ExecArgReadonlyFileNode(ExecArgReadonlyFileNode),
     IdMapReadonlyFileNode(IdMapReadonlyFileNode),
     UptimeFileNode(UptimeFileNode),
+    #[cfg(feature = "cc")]
+    SecretInfoFileNode(SecretInfoFileNode),
 }
 
 #[enum_dispatch(ReadonlyFileNode)]

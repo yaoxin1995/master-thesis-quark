@@ -49,9 +49,11 @@ use crate::GUEST_KERNEL;
 #[cfg(feature = "cc")]
 use crate::qlib::kernel::Kernel::is_cc_enabled;
 #[cfg(feature = "cc")]
-use crate::shield::{APPLICATION_INFO_KEEPER, exec_shield::EXEC_AUTH_AC, software_measurement_manager};
+use crate::shield::{APPLICATION_INFO_KEEPER, exec_shield::EXEC_AUTH_AC, software_measurement_manager, secret_injection};
 #[cfg(feature = "cc")]
 use crate::qlib::shield_policy::*;
+#[cfg(feature = "cc")]
+use crate::qlib::kernel::boot::config;
 
 impl Process {
     pub fn TaskCaps(&self) -> TaskCaps {
@@ -578,6 +580,22 @@ impl Loader {
         );
         let rootMounts = InitRootFs(Task::Current(), &processSpec.Root)
             .expect("in loader::StartSubContainer, InitRootfs fail");
+
+        #[cfg(feature = "cc")]
+        if is_cc_enabled(){
+            let config = config::Config {
+                RootDir: processSpec.Root.clone(),
+                Debug: true,
+            };
+ 
+            debug!("secret_injection::FileSystemMount::init before");
+            let secrets_mount_info = secret_injection::FileSystemMount::init(config, rootMounts.Root(), rootMounts.clone());
+            let mut secret_injector =  secret_injection::SECRET_KEEPER.write();
+            secret_injector.set_secrets_mount_info(secrets_mount_info).unwrap();
+            debug!("secret_injection::FileSystemMount::init after");
+       }
+
+
         kernel
             .mounts
             .write()
