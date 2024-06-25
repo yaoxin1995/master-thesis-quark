@@ -72,6 +72,21 @@ extern crate base64ct;
 extern crate postcard;
 #[cfg(feature = "cc")]
 extern crate modular_bitfield;
+#[cfg(feature = "cc")]
+extern crate embedded_tls;
+#[cfg(feature = "cc")]
+extern crate embedded_io;
+#[cfg(feature = "cc")]
+extern crate httparse;
+#[cfg(feature = "cc")]
+extern crate rsa;
+#[cfg(feature = "cc")]
+extern crate zeroize;
+#[cfg(feature = "cc")]
+extern crate ssh_key;
+#[cfg(feature = "cc")]
+extern crate base64;
+
 
 use core::panic::PanicInfo;
 use core::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
