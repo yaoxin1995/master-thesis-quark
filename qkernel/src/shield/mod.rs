@@ -8,6 +8,8 @@ pub mod terminal_shield;
 pub mod sev_guest;
 pub mod https_attestation_provisioning_cli;
 pub mod secret_injection;
+pub mod sys_attestation_report;
+
 
 use crate::aes_gcm::{ Aes256Gcm, Key};
 use alloc::{vec::Vec, string::String};

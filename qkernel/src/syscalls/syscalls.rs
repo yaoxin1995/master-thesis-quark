@@ -61,6 +61,11 @@ use super::super::qlib::linux_def::*;
 use super::super::qlib::SysCallID;
 use super::super::task::*;
 
+#[cfg(feature = "cc")]
+use crate::shield::sys_attestation_report::*;
+
+
+
 //#[repr(align(128))]
 #[derive(Debug)]
 pub struct SyscallArguments {
@@ -604,6 +609,8 @@ pub const SYS_CALL_TABLE: &'static [SyscallFn] = &[
     NotImplementSyscall, //	448 sys_process_mrelease
     NotImplementSyscall, //	449 sys_futex_waitv
     NotImplementSyscall, //	450 sys_set_mempolicy_home_node
+    #[cfg(feature = "cc")]
+    SysAttestationReport, // 451 sys_attestation_report
     NotExisting,         // 451 unknow syscall
 ];
 

@@ -1067,11 +1067,10 @@ fn get_kbs_signing_key(tls: &mut TlsConnection<ShieldProvisioningHttpSClient, Ae
 
     log::debug!("get_kbs_signing_key from kbs {}", &*to_private_key.to_openssh(ssh_key::LineEnding::LF).unwrap());
 
-    // TODO ADD AFTER sys_attestation_report
-    // {
-    //     let mut kbs_signing_key_keeper = super::sys_attestation_report::KBS_SIGNING_KEY_KEEPER.write();
-    //     kbs_signing_key_keeper.set_kbs_signing_key(secret).unwrap();
-    // }
+    {
+        let mut kbs_signing_key_keeper = super::sys_attestation_report::KBS_SIGNING_KEY_KEEPER.write();
+        kbs_signing_key_keeper.set_kbs_signing_key(secret).unwrap();
+    }
 
     Ok(to_private_key)
 }
