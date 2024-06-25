@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use alloc::string::String;
-
+#[derive(Default, Clone)]
 pub struct Config {
     pub RootDir: String,
     pub Debug: bool,

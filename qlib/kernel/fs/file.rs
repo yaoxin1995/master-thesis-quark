@@ -87,6 +87,8 @@ use crate::shield::inode_tracker::INODE_TRACKER;
 use crate::qlib::shield_policy::TrackInodeType;         
 #[cfg(feature = "cc")]
 use crate::qlib::kernel::Kernel::is_cc_enabled;
+#[cfg(feature = "cc")]
+use crate::qlib::kernel::fs::secretfs::proc::SecretFile;
 
 use super::attr::*;
 use super::dirent::*;
@@ -310,6 +312,8 @@ pub enum FileOpsType {
     SignalOperation,
     InotifyFileOperations,
     ProxyFileOperations,
+    #[cfg(feature = "cc")]
+    SecretFile
 }
 
 #[derive(Clone)]
@@ -353,6 +357,8 @@ pub enum FileOps {
     TsotSocketOperations(TsotSocketOperations),
     UnixSocketOperations(UnixSocketOperations),
     RootProcFile(RootProcFile),
+    #[cfg(feature = "cc")]
+    SecretFile(SecretFile)
 }
 
 impl FileOps {

@@ -5,6 +5,7 @@ pub mod software_measurement_manager;
 pub mod terminal_shield;
 pub mod sev_guest;
 pub mod https_attestation_provisioning_cli;
+pub mod secret_injection;
 
 use spin::rwlock::RwLock;
 use crate::qlib::common::*;

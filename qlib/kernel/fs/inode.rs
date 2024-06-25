@@ -76,6 +76,8 @@ use crate::qlib::kernel::socket::unix::unix::UnixSocketInodeOps;
 
 #[cfg(feature = "cc")]
 use crate::shield::inode_tracker::*;
+#[cfg(feature = "cc")]
+use crate::qlib::kernel::fs::secretfs::dir_proc::SecDirNode;
 
 
 pub fn ContextCanAccessFile(task: &Task, inode: &Inode, reqPerms: &PermMask) -> Result<bool> {
@@ -152,6 +154,8 @@ pub enum IopsType {
     SymlinkNode,
     SimpleFileInode,
     ProxyDevice,
+    #[cfg(feature = "cc")]
+    SecDirNode
 }
 
 #[enum_dispatch]
@@ -185,6 +189,8 @@ pub enum Iops {
     SlaveInodeOperations(SlaveInodeOperations),
     PipeIops(PipeIops),
     UnixSocketInodeOps(UnixSocketInodeOps),
+    #[cfg(feature = "cc")]
+    SecDirNode(SecDirNode),
 }
 
 impl Iops {
