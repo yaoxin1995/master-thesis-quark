@@ -39,10 +39,10 @@ $(cc_kernel_debug): cc_kernel_debug $(assembly_object_files)
 		$(assembly_object_files) $(qkernel_debug)
 
 kernel:
-	CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) build --target $(arch)-qkernel.json --release
+	CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) xbuild --target $(arch)-qkernel.json --release
 
 kernel_debug:
-	CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) build --target $(arch)-qkernel.json
+	CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) xbuild --target $(arch)-qkernel.json
 
 cc_kernel:
 	RUSTFLAGS="--cfg aes_force_soft --cfg polyval_force_soft --cfg log" CARGO_TARGET_DIR=../target cargo +$(TOOLCHAIN) xbuild --target $(arch)-qkernel.json --release --features cc
