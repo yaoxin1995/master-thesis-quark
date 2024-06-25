@@ -41,7 +41,7 @@ use crate::qlib::shield_policy::*;
 #[cfg(feature = "cc")]
 use crate::shield::{//secret_injection::SECRET_KEEPER, 
     software_measurement_manager, 
-    //https_attestation_provisioning_cli, 
+    https_attestation_provisioning_cli, 
     policy_provisioning,
     APPLICATION_INFO_KEEPER, 
     guest_syscall_interceptor,
@@ -388,63 +388,62 @@ pub fn LoadCC(
         // skip if application is restarted
         if !app_loaded {
 
-            // TODO: when https_attestation_provisioning_cli is added
-            // let res = https_attestation_provisioning_cli::provisioning_http_client(task, &software_measurement);
-            // if res.is_err() {
-            //     info!("https_attestation_provisioning_cli::provisioning_http_client(task) got error {:?}", res);
-            //     return Err(res.err().unwrap());
-            // }
+            let res = https_attestation_provisioning_cli::provisioning_http_client(task, &software_measurement);
+            if res.is_err() {
+                info!("https_attestation_provisioning_cli::provisioning_http_client(task) got error {:?}", res);
+                return Err(res.err().unwrap());
+            }
     
-            // let (shield_policy, secret) = res.unwrap();
+            let (shield_policy, secret) = res.unwrap();
             // updata the policy
 
-            let mut shield_policy = KbsPolicy::default();
+            info!("provisioning_http_client 11, {:?}", shield_policy);
+
+            // let mut shield_policy = KbsPolicy::default();
             
 
-            // TEST
-            {
-                shield_policy.qkernel_log_config.enable = true;
-                shield_policy.qkernel_log_config.allowed_max_log_level = QkernelDebugLevel::Debug;
-                shield_policy.privileged_user_key_slice = "a very simple secret key to use!".to_string();
+            // // TEST
+            // {
+            //     shield_policy.qkernel_log_config.enable = true;
+            //     shield_policy.qkernel_log_config.allowed_max_log_level = QkernelDebugLevel::Debug;
+            //     shield_policy.privileged_user_key_slice = "a very simple secret key to use!".to_string();
 
-                shield_policy.syscall_interceptor_config.enable = true;
-                shield_policy.syscall_interceptor_config.syscalls = [18446744073709551615,18446744073709551615,18446744073709551615,18446744073709551615,18446744073709551615,7935,18446742974197923840,15];
+            //     shield_policy.syscall_interceptor_config.enable = true;
+            //     shield_policy.syscall_interceptor_config.syscalls = [18446744073709551615,18446744073709551615,18446744073709551615,18446744073709551615,18446744073709551615,7935,18446742974197923840,15];
             
             
             
-                shield_policy.privileged_user_config.enable_terminal = true;
-                shield_policy.privileged_user_config.enable_single_shot_command_line_mode = true;
-                shield_policy.privileged_user_config.exec_result_encryption = true;
-                shield_policy.privileged_user_config.enable_container_logs_encryption = true;
-                shield_policy.privileged_user_config.enable_container_logs_encryption = true;
-                shield_policy.privileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string(), "cat".to_string()];
-                shield_policy.privileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/var".to_string()];
+            //     shield_policy.privileged_user_config.enable_terminal = true;
+            //     shield_policy.privileged_user_config.enable_single_shot_command_line_mode = true;
+            //     shield_policy.privileged_user_config.exec_result_encryption = true;
+            //     shield_policy.privileged_user_config.enable_container_logs_encryption = true;
+            //     shield_policy.privileged_user_config.enable_container_logs_encryption = true;
+            //     shield_policy.privileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string(), "cat".to_string()];
+            //     shield_policy.privileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/var".to_string()];
 
 
-                shield_policy.unprivileged_user_config.enable_single_shot_command_line_mode = true;
-                shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string()];
-                shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/var/log".to_string()];
+            //     shield_policy.unprivileged_user_config.enable_single_shot_command_line_mode = true;
+            //     shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_cmd = vec!["ls".to_string()];
+            //     shield_policy.unprivileged_user_config.single_shot_command_line_mode_configs.allowed_dir = vec!["/var/log".to_string()];
 
 
-                let ehd_chunks = vec![
-                    software_measurement.to_string().into_bytes(),
-                ];
+            //     let ehd_chunks = vec![
+            //         software_measurement.to_string().into_bytes(),
+            //     ];
         
-                let ehd = crate::shield::hash_chunks(ehd_chunks);
-                let tee_evidence;
-                {
-                    let mut attester = GUEST_SEV_DEV.write();
-                    tee_evidence = attester
-                        .get_report(ehd)
-                        .map_err(|e| Error::Common(format!("generate_evidence get report failed: {:?}", e)))?;
-                }
+            //     let ehd = crate::shield::hash_chunks(ehd_chunks);
+            //     let tee_evidence;
+            //     {
+            //         let mut attester = GUEST_SEV_DEV.write();
+            //         tee_evidence = attester
+            //             .get_report(ehd)
+            //             .map_err(|e| Error::Common(format!("generate_evidence get report failed: {:?}", e)))?;
+            //     }
 
-                info!("tee_evidence {:?}", tee_evidence);
-                
-                
-            }
+            //     info!("tee_evidence {:?}", tee_evidence);
+            // }
 
-            info!("before policy_provisioning");
+            info!("before policy_provisioning policy");
             policy_provisioning(&shield_policy).unwrap();
             info!("after policy_provisioning");
 

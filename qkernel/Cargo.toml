@@ -27,6 +27,14 @@ base64ct = { version = "1.5.3",  features = ["alloc"]}
 postcard ={ version = "1.0", features = ["alloc"] }
 cfg-if = "0.1"
 modular-bitfield = "0.11.2"
+embedded-tls  = { git = "https://github.com/yaoxin1995/embedded-tls.git", default-features = false, features = ["log"] }
+embedded-io = "0.4.0"
+httparse = { version ="1.8.0", default-features = false }
+rsa = { version = "0.6.1", default-features = false, features = ["pem"] }
+zeroize = "1.6.0"
+ssh-key  = {version = "0.6.0-rc.0", default-features = false, features = ["alloc",  "crypto"]}
+base64 = {version = "0.12.3", default-features = false, features = ["alloc"]}
+rand = { version = "0.8.3", features = ["getrandom"], default-features = false }
 
 [features]
 cc = []

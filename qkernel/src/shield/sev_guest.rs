@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use spin::rwlock::RwLock;
 use base64ct::{Base64, Encoding};
 use alloc::string::String;
-
+use shield::https_attestation_provisioning_cli::Tee;
 
 const MAX_AUTHTAG_LEN: usize = 32;
 const VMPCK_KEY_LEN: usize = 32;
@@ -360,4 +360,10 @@ impl SnpGuestDev {
 	}
 
 
+}
+
+// Detect which TEE platform the KBC running environment is.
+pub fn detect_tee_type() -> Tee {
+	// Now assume we are running on amd sev snp
+	Tee::Snp
 }
