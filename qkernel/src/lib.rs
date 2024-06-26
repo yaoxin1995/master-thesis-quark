@@ -100,15 +100,12 @@ use vcpu::CPU_LOCAL;
 
 use crate::qlib::kernel::GlobalIOMgr;
 
-//use self::qlib::buddyallocator::*;
 use self::asm::*;
 use self::boot::controller::*;
 use self::boot::loader::*;
 use self::kernel::timer::*;
 use self::kernel_def::*;
 use self::loader::vdso::*;
-//use linked_list_allocator::LockedHeap;
-//use buddy_system_allocator::LockedHeap;
 use self::qlib::common::*;
 use self::qlib::config::*;
 use self::qlib::control_msg::*;
@@ -126,7 +123,6 @@ use self::qlib::kernel::quring;
 use self::qlib::kernel::Kernel;
 use self::qlib::kernel::*;
 use self::qlib::{ShareSpaceRef, SysCallID};
-//use self::vcpu::*;
 use self::qlib::kernel::socket;
 use self::qlib::kernel::task;
 use self::qlib::kernel::taskMgr;
@@ -153,10 +149,6 @@ use self::threadmgr::task_sched::*;
 #[cfg(feature = "cc")]
 use self::qlib::mem::cc_allocator::*;
 #[cfg(feature = "cc")]
-use alloc::boxed::Box;
-#[cfg(feature = "cc")]
-use memmgr::pma::PageMgr;
-#[cfg(feature = "cc")]
 use shield::{init_shielding_layer, software_measurement_manager};
 
 
@@ -178,7 +170,6 @@ cfg_cc! {
     use crate::qlib::kernel::Kernel_cc::LOG_AVAILABLE;
     use self::qlib::cc::sev_snp::{set_cbit_mask, pvalidate, PvalidateSize};
     use crate::qlib::cc::sev_snp::ghcb::*;
-    use crate::qlib::mem::cc_allocator::*;
     use crate::qlib::kernel::arch::__arch::arch_def::*;
     use alloc::boxed::Box;
     use memmgr::pma::PageMgr;
@@ -193,7 +184,6 @@ mod shield;
 pub static VCPU_ALLOCATOR: GlobalVcpuAllocator = GlobalVcpuAllocator::New();
 
 pub static GLOBAL_ALLOCATOR: HostAllocator = HostAllocator::New();
-//pub static GLOBAL_ALLOCATOR: BitmapAllocatorWrapper = BitmapAllocatorWrapper::New();
 
 #[cfg(feature = "cc")]
 pub static  IS_GUEST: bool = true;

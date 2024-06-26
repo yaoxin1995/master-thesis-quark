@@ -397,7 +397,7 @@ pub fn LoadCC(
 
             // info!("provisioning_http_client 11, {:?}", shield_policy);
 
-            let mut shield_policy = shield_policy.clone();
+            // let mut shield_policy = shield_policy.clone();
 
             info!("provisioning_http_client 11, {:?}", shield_policy);
             

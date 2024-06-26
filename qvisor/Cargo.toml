@@ -64,6 +64,8 @@ aes-gcm = "0.10.1"
 getrandom = { version = "0.2", features = ["rdrand"] }
 cfg-if = "0.1"
 modular-bitfield = "0.11.2"
+sha2 = { version = "0.10.6", default-features = false,  features = ["force-soft"]}
+base64ct = { version = "1.5.3",  features = ["alloc"]}
 [features]
 cuda = ["cuda-driver-sys", "cuda-runtime-sys", "libelf", "rcublas-sys", "cuda11-cublasLt-sys"]
 cc = []

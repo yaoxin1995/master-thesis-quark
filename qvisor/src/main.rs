@@ -129,6 +129,8 @@ use vmspace::*;
 use crate::qlib::mem::cc_allocator::*;
 #[cfg(feature = "cc")]
 use crate::qlib::kernel::kernel::kernel::Kernel;
+#[cfg(feature = "cc")]
+use crate::qlib::cc::sev_snp::{check_amd, check_snp_support, set_cbit_mask};
 
 pub fn AllocatorPrint(_class: usize) -> String {
     return "".to_string();
@@ -224,6 +226,14 @@ fn main() {
             #[cfg(feature = "cc")]
             CCMode::NormalEmu => {
                 ENABLE_CC.store(true,Ordering::Release);
+            }
+            #[cfg(feature = "cc")]
+            CCMode::SevSnp => {
+                if check_amd() && check_snp_support() {
+                    ENABLE_CC.store(true, Ordering::Release);
+                    IS_SEV_SNP.store(true, Ordering::Release);
+                    set_cbit_mask();
+                }
             }
             _ => panic!("CCMode not compiled!"),
         }
